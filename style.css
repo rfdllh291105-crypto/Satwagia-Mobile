@@ -1,0 +1,93 @@
+/* ============================================================
+   Klinik Satwagia HRIS — Custom Styles
+   ============================================================ */
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Menu aktif di sidebar */
+.menu-active {
+  background: #7c3aed;
+  color: #fff;
+}
+.menu-active:hover {
+  background: #6d28d9;
+}
+
+/* ============================================================
+   RESPONSIVE — MOBILE-FIRST
+   ============================================================ */
+@media (max-width: 768px) {
+  main table {
+    font-size: 12px;
+  }
+  main table th,
+  main table td {
+    padding: 6px 10px !important;
+    white-space: nowrap;
+  }
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal jadi bottom-sheet di HP */
+  #modal {
+    padding: 0;
+    align-items: flex-end;
+  }
+  #modalContent {
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 94vh;
+  }
+
+  main button:not(.inline-btn) {
+    min-height: 38px;
+  }
+}
+
+/* Scroll halus di iOS */
+main {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide spinner di input number */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ============================================================
+   KAMERA UNTUK ABSENSI
+   ============================================================ */
+.camera-wrap {
+  position: relative;
+  background: #1e1b4b;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.camera-wrap video,
+.camera-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.camera-wrap .mirror {
+  transform: scaleX(-1);
+}
+
+/* ============================================================
+   PRINT — CETAK SLIP GAJI
+   ============================================================ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
