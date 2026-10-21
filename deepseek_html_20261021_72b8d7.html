@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Klinik Satwagia — HRIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent}
+  .menu-active{background:#0d9488;color:#fff}
+  .menu-active:hover{background:#0f766e}
+  .safe-bottom{padding-bottom:env(safe-area-inset-bottom)}
+  @media (max-width: 768px){
+    main table { font-size: 12px; }
+    main table th, main table td { padding: 6px 10px !important; white-space: nowrap; }
+    .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+    #modal { padding: 0; align-items: flex-end; }
+    #modalContent { max-width: 100%; border-radius: 12px 12px 0 0; max-height: 92vh; }
+    main button:not(.inline-btn) { min-height: 38px; }
+  }
+  main { -webkit-overflow-scrolling: touch; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  @media print{
+    .no-print{display:none!important}
+    body{background:#fff}
+  }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+<!-- ========== LOGIN ========== -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-xl p-6 md:p-8 w-full max-w-md">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🐾</div>
+      <h1 class="text-xl md:text-2xl font-bold">Klinik Satwagia</h1>
+      <p class="text-xs md:text-sm text-slate-500">HRIS · Attendance · Payroll</p>
+    </div>
+    <div class="space-y-3">
+      <div><label class="text-xs text-slate-600">Username</label>
+        <input id="inUser" type="text" autocomplete="username" value="superadmin" class="w-full border rounded px-3 py-2.5 mt-1 text-sm"></div>
+      <div><label class="text-xs text-slate-600">Password</label>
+        <input id="inPass" type="password" autocomplete="current-password" value="admin123" class="w-full border rounded px-3 py-2.5 mt-1 text-sm"></div>
+      <button onclick="doLogin()" class="w-full bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white py-3 rounded font-medium text-base">Masuk</button>
+      <p id="loginErr" class="text-red-600 text-xs text-center hidden"></p>
+    </div>
+    <div class="mt-6 border-t pt-4">
+      <p class="text-xs text-slate-500 mb-2">Demo akun (tap untuk isi otomatis):</p>
+      <div class="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
+        <button onclick="fillLogin('superadmin','admin123')" class="text-left px-2 py-1.5 bg-slate-50 rounded text-slate-700 hover:bg-slate-100">superadmin/admin123</button>
+        <button onclick="fillLogin('hrd','hrd123')" class="text-left px-2 py-1.5 bg-slate-50 rounded text-slate-700 hover:bg-slate-100">hrd/hrd123</button>
+        <button onclick="fillLogin('finance','finance123')" class="text-left px-2 py-1.5 bg-slate-50 rounded text-slate-700 hover:bg-slate-100">finance/finance123</button>
+        <button onclick="fillLogin('mgr1','mgr123')" class="text-left px-2 py-1.5 bg-slate-50 rounded text-slate-700 hover:bg-slate-100">mgr1/mgr123</button>
+        <button onclick="fillLogin('mgr2','mgr123')" class="text-left px-2 py-1.5 bg-slate-50 rounded text-slate-700 hover:bg-slate-100">mgr2/mgr123</button>
+        <button onclick="fillLogin('emp001','emp123')" class="text-left px-2 py-1.5 bg-slate-50 rounded text-slate-700 hover:bg-slate-100">emp001/emp123</button>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-2 leading-snug">💡 <b>Semua 66 karyawan klinik punya akun</b>: <span class="font-mono">emp001</span> – <span class="font-mono">emp066</span>, password <span class="font-mono">emp123</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== APP ========== -->
+<div id="app-screen" class="hidden min-h-screen flex flex-col">
+  <header class="bg-teal-700 text-white px-3 md:px-6 py-3 flex items-center justify-between no-print sticky top-0 z-30 shadow-md">
+    <div class="flex items-center gap-2 md:gap-3 min-w-0">
+      <button onclick="toggleSidebar()" class="md:hidden p-2 -ml-2 rounded hover:bg-teal-800 active:bg-teal-900" aria-label="Menu">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="text-xl md:text-2xl">🐾</span>
+      <div class="min-w-0">
+        <h1 class="font-bold leading-none text-sm md:text-base truncate">Klinik Satwagia</h1>
+        <p class="text-[10px] md:text-xs text-teal-200 hidden md:block">HRIS System</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 md:gap-3 text-sm">
+      <div class="text-right min-w-0">
+        <div id="hdrName" class="font-medium leading-none text-xs md:text-sm truncate max-w-[110px] md:max-w-none"></div>
+        <div id="hdrRole" class="text-[10px] md:text-xs text-teal-200 truncate max-w-[110px] md:max-w-none"></div>
+      </div>
+      <button onclick="doLogout()" class="bg-teal-800 hover:bg-teal-900 active:bg-black px-2 md:px-3 py-1.5 rounded text-xs whitespace-nowrap">Logout</button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 relative">
+    <div id="sidebar-backdrop" onclick="closeSidebarDrawer()" class="hidden md:hidden fixed inset-0 bg-black/50 z-30"></div>
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-40 w-64 md:w-56 bg-white border-r h-full md:min-h-screen p-3 pt-20 md:pt-3 transform -translate-x-full md:translate-x-0 transition-transform duration-200 no-print overflow-y-auto"></aside>
+    <main id="main" class="flex-1 min-w-0 p-3 md:p-6 pb-16 md:pb-6"></main>
+  </div>
+</div>
+
+<div id="modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+  <div id="modalContent" class="bg-white rounded-t-xl md:rounded-lg shadow-xl max-w-3xl w-full p-4 md:p-6 max-h-[92vh] overflow-y-auto"></div>
+</div>
+
+<script>
+/* ============================================================
+   STATE & SEED — 66 KARYAWAN KLINIK
+   ============================================================ */
+const STORAGE_KEY = 'satwagia_hris_v2'; // bumped: 66 karyawan + jobdesc
+const TOTAL_EMPLOYEES = 66;
+
+const POSITIONS = [
+  {name:'Dokter Hewan', base:9000000},
+  {name:'Perawat Hewan', base:4500000},
+  {name:'Resepsionis', base:3800000},
+  {name:'Admin Klinik', base:4200000},
+  {name:'Kasir', base:3800000},
+];
+
+/* Jobdesc per jabatan */
+const JOBDESCS = {
+  'Dokter Hewan':
+    'Memeriksa, mendiagnosis, dan mengobati hewan; melakukan tindakan medis & operasi; memberikan edukasi ke pemilik hewan; mengawasi kerja perawat hewan; mencatat rekam medis pasien.',
+  'Perawat Hewan':
+    'Membantu dokter hewan dalam tindakan medis; merawat hewan rawat inap; menyiapkan alat & obat; monitoring kondisi pasien; sterilisasi alat; mendampingi pemilik hewan.',
+  'Resepsionis':
+    'Menerima pendaftaran pasien; mengatur jadwal dokter; menjawab telepon & pertanyaan klien; mengelola antrian; konfirmasi kontrol ulang; input data pasien ke sistem.',
+  'Admin Klinik':
+    'Mengelola administrasi cabang; monitoring stok obat & alat; membuat laporan harian cabang; koordinasi dengan kantor pusat; input & update data pasien.',
+  'Kasir':
+    'Memproses pembayaran pasien; menerbitkan struk & invoice; rekapitulasi transaksi harian; tutup kasir; setor keuangan ke finance; pelayanan pembayaran klien.',
+};
+
+const FIRSTNAMES = ['Budi','Siti','Agus','Dewi','Rian','Nisa','Fajar','Ayu','Bayu','Rina','Hendra','Putri','Yoga','Lestari','Arif','Wulan','Dimas','Sari','Eko','Maya'];
+const LASTNAMES  = ['Santoso','Nurhaliza','Setiawan','Lestari','Pratama','Aulia','Ramadhan','Wulandari','Aditya','Marlina'];
+
+let state = null;
+
+function seedData(){
+  const branches = Array.from({length:10},(_,i)=>({
+    id:i+1, name:'Cabang '+(i+1), address:'Jl. Contoh No.'+(i+1), phone:'021-5550'+(100+i)
+  }));
+
+  const employees = [];
+  for(let i=0;i<TOTAL_EMPLOYEES;i++){
+    const pos = POSITIONS[i%POSITIONS.length];
+    const br  = branches[i%10];
+    employees.push({
+      id:'EMP'+String(i+1).padStart(3,'0'),
+      name: FIRSTNAMES[i%FIRSTNAMES.length]+' '+LASTNAMES[i%LASTNAMES.length],
+      branchId: br.id,
+      position: pos.name,
+      jobdesc: JOBDESCS[pos.name],
+      base: pos.base,
+      allowance: 500000,
+      bankName:['BCA','Mandiri','BNI','BRI'][i%4],
+      bankAccount: String(1000000000+i),
+      joinedAt:'2024-'+String((i%9)+1).padStart(2,'0')+'-15',
+      status:'active'
+    });
+  }
+
+  /* Users: 5 admin/manager + 66 karyawan */
+  const users = [
+    {username:'superadmin',password:'admin123',name:'Super Admin',role:'superadmin'},
+    {username:'hrd',password:'hrd123',name:'Sarah HRD',role:'hrd'},
+    {username:'finance',password:'finance123',name:'Budi Finance',role:'finance'},
+    {username:'mgr1',password:'mgr123',name:'Andi (Cabang 1)',role:'manager',branchId:1},
+    {username:'mgr2',password:'mgr123',name:'Rina (Cabang 2)',role:'manager',branchId:2},
+  ];
+  /* Setiap 66 karyawan otomatis punya akun: emp001..emp066 / emp123 */
+  employees.forEach(e=>users.push({
+    username:e.id.toLowerCase(), password:'emp123', name:e.name, role:'employee', employeeId:e.id
+  }));
+
+  /* Absensi 30 hari terakhir (weekday only) */
+  const attendances = [];
+  const today = new Date();
+  for(let d=1; d<=30; d++){
+    const date = new Date(today); date.setDate(date.getDate()-d);
+    if(date.getDay()===0||date.getDay()===6) continue;
+    const ds = date.toISOString().slice(0,10);
+    employees.forEach((e,idx)=>{
+      const r = (idx+d*3)%12;
+      let status='hadir', inTime='08:00', outTime='17:00', late=0;
+      if(r===0){status='izin';inTime='-';outTime='-';}
+      else if(r===1){status='sakit';inTime='-';outTime='-';}
+      else if(r===2){inTime='08:15';late=15;}
+      else if(r===3){inTime='08:30';late=30;}
+      else if(r===4){inTime='08:45';late=45;}
+      attendances.push({
+        id:'ATT'+ds.replace(/-/g,'')+e.id,
+        empId:e.id, date:ds, inTime, outTime,
+        lateMinutes:late, status, source:'workting'
+      });
+    });
+  }
+
+  /* Lembur */
+  const overtimeRequests = [];
+  employees.slice(0,20).forEach((e,i)=>{
+    const d = new Date(); d.setDate(d.getDate()-(i%15));
+    overtimeRequests.push({
+      id:'OT'+String(i+1).padStart(3,'0'),
+      empId:e.id, branchId:e.branchId,
+      date:d.toISOString().slice(0,10),
+      hours:[1,2,3,2,1.5,4][i%6],
+      reason:['Closing bulanan','Extra shift','Emergency','Stock opname','Kunjungan luar'][i%5],
+      status:['approved','approved','pending','pending','rejected'][i%5],
+      approvedBy:i<2?'Sarah HRD':null,
+      approvedAt:i<2?new Date().toISOString():null,
+      createdAt:d.toISOString()
+    });
+  });
+
+  /* Cuti/Izin */
+  const leaveRequests = employees.slice(0,12).map((e,i)=>{
+    const d = new Date(); d.setDate(d.getDate()+(i+2));
+    return {
+      id:'LV'+String(i+1).padStart(3,'0'),
+      empId:e.id, branchId:e.branchId,
+      type:['cuti','izin','sakit'][i%3],
+      startDate:d.toISOString().slice(0,10),
+      endDate:d.toISOString().slice(0,10),
+      reason:['Keperluan keluarga','Sakit demam','Urusan pribadi'][i%3],
+      status:i%3===0?'approved':'pending',
+      approvedBy:i%3===0?'Sarah HRD':null,
+      createdAt:d.toISOString()
+    };
+  });
+
+  const st = {
+    branches, employees, users, attendances, overtimeRequests, leaveRequests,
+    payrollRuns:[], auditLog:[], currentUser:null, version:2
+  };
+
+  /* Seed 1 payroll published bulan lalu */
+  const prev = new Date(); prev.setMonth(prev.getMonth()-1);
+  const period = prev.toISOString().slice(0,7);
+  const rows = computeRowsForPeriod(st, period);
+  st.payrollRuns.push({
+    id:'PR-'+period, period, rows, status:'published',
+    createdBy:'Budi Finance', createdAt:prev.toISOString(),
+    finalizedAt:prev.toISOString(), publishedAt:prev.toISOString()
+  });
+  st.auditLog.push({ts:prev.toISOString(),user:'system',action:'Seed 66 karyawan + payroll '+period+' published'});
+  return st;
+}
+
+function computeRowsForPeriod(st, period){
+  return st.employees.map(e=>{
+    const att = st.attendances.filter(a=>a.empId===e.id && a.date.startsWith(period));
+    const hadir = att.filter(a=>a.status==='hadir').length;
+    const alpha = att.filter(a=>a.status!=='hadir').length;
+    const lateMin = att.reduce((s,a)=>s+(a.lateMinutes||0),0);
+    const ots = st.overtimeRequests.filter(o=>o.empId===e.id && o.status==='approved' && o.date.startsWith(period));
+    const otHours = ots.reduce((s,o)=>s+o.hours,0);
+    const hourlyRate = e.base/173;
+    const overtimePay = Math.round(otHours*hourlyRate*1.5);
+    const lateDeduction = Math.floor(lateMin/60)*50000;
+    const absenceDeduction = alpha*Math.round(e.base/22);
+    const bpjs = Math.round(e.base*0.02);
+    const pph21 = e.base>5000000?Math.round(e.base*0.05):0;
+    const gross = e.base+e.allowance+overtimePay;
+    const deductions = lateDeduction+absenceDeduction+bpjs+pph21;
+    const net = gross-deductions;
+    return {
+      empId:e.id, name:e.name, branchId:e.branchId, position:e.position,
+      bankName:e.bankName, bankAccount:e.bankAccount,
+      base:e.base, allowance:e.allowance,
+      otHours, overtimePay, lateMinutes:lateMin, lateDeduction,
+      hadir, alpha, absenceDeduction, bpjs, pph21,
+      gross, deductions, net
+    };
+  });
+}
+
+/* ============================================================
+   PERSISTENCE
+   ============================================================ */
+function loadState(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try{
+      const s = JSON.parse(raw);
+      if(s.version===2) return s;
+    }catch(e){}
+  }
+  const s = seedData();
+  saveState(s);
+  return s;
+}
+function saveState(s){ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+function persist(){ saveState(state); }
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const fmt = n => 'Rp '+Number(n||0).toLocaleString('id-ID');
+const fmtDate = d => d? new Date(d).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';
+const branchName = id => (state.branches.find(b=>b.id===id)||{}).name||'-';
+const empById = id => state.employees.find(e=>e.id===id);
+function badge(s){
+  const m={
+    hadir:'bg-green-100 text-green-700', izin:'bg-blue-100 text-blue-700',
+    sakit:'bg-yellow-100 text-yellow-700', alpha:'bg-red-100 text-red-700',
+    pending:'bg-yellow-100 text-yellow-700', approved:'bg-green-100 text-green-700',
+    rejected:'bg-red-100 text-red-700', draft:'bg-slate-100 text-slate-700',
+    finalized:'bg-blue-100 text-blue-700', published:'bg-green-100 text-green-700',
+    active:'bg-green-100 text-green-700'
+  };
+  return '<span class="px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap '+(m[s]||'bg-slate-100')+'">'+s+'</span>';
+}
+function audit(action){
+  state.auditLog.unshift({
+    ts:new Date().toISOString(),
+    user:state.currentUser?state.currentUser.name:'system',
+    action
+  });
+  if(state.auditLog.length>200) state.auditLog=state.auditLog.slice(0,200);
+}
+function closeModal(){ document.getElementById('modal').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+function openModal(html){ document.getElementById('modalContent').innerHTML=html; document.getElementById('modal').classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+function toast(msg,type){
+  const c = type==='err'?'bg-red-600':(type==='warn'?'bg-yellow-600':'bg-green-600');
+  const d = document.createElement('div');
+  d.className='fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm '+c+' text-white px-4 py-3 rounded shadow-lg text-sm z-50 text-center md:text-left';
+  d.textContent=msg;
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),2500);
+}
+
+/* ============================================================
+   MODAL DETAIL KARYAWAN + JOBDESC (shared, dipakai semua role)
+   ============================================================ */
+window.viewEmpDetail = empId=>{
+  const e = empById(empId); if(!e) return;
+  const todayStr = new Date().toISOString().slice(0,10);
+  const todayAtt = state.attendances.find(a=>a.empId===e.id && a.date===todayStr);
+  const myOT = state.overtimeRequests.filter(o=>o.empId===e.id && o.status==='approved').reduce((s,o)=>s+o.hours,0);
+  const myPayslip = state.payrollRuns.filter(r=>r.status==='published' && r.rows.some(x=>x.empId===e.id)).slice(-1)[0];
+
+  openModal(
+    '<div class="flex items-start justify-between gap-3 mb-3">'+
+      '<div class="flex items-center gap-2"><span class="text-2xl">🐾</span>'+
+        '<div><h3 class="font-bold text-base md:text-lg leading-none">'+e.name+'</h3>'+
+        '<p class="text-xs text-slate-500">'+e.id+' · '+e.position+'</p></div>'+
+      '</div>'+
+      '<button onclick="closeModal()" class="p-1 rounded hover:bg-slate-100"><svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>'+
+    '</div>'+
+    '<div class="bg-teal-50 rounded p-3 mb-3">'+
+      '<p class="text-xs font-semibold text-teal-800 mb-1">📋 Jobdesc — '+e.position+'</p>'+
+      '<p class="text-sm text-slate-700 leading-relaxed">'+e.jobdesc+'</p>'+
+    '</div>'+
+    '<div class="grid grid-cols-2 gap-2 text-sm mb-3">'+
+      '<div><span class="text-slate-500">Cabang:</span> '+branchName(e.branchId)+'</div>'+
+      '<div><span class="text-slate-500">Status:</span> '+badge(e.status)+'</div>'+
+      '<div><span class="text-slate-500">Gaji Pokok:</span> '+fmt(e.base)+'</div>'+
+      '<div><span class="text-slate-500">Tunjangan:</span> '+fmt(e.allowance)+'</div>'+
+      '<div class="col-span-2"><span class="text-slate-500">Rekening:</span> '+e.bankName+' · '+e.bankAccount+'</div>'+
+      '<div class="col-span-2"><span class="text-slate-500">Masuk:</span> '+fmtDate(e.joinedAt)+'</div>'+
+    '</div>'+
+    '<div class="grid grid-cols-3 gap-2 text-center text-xs mb-3">'+
+      '<div class="bg-slate-50 p-2 rounded"><p class="text-slate-500">Hari ini</p><p class="font-bold">'+(todayAtt?todayAtt.status:'belum')+'</p></div>'+
+      '<div class="bg-slate-50 p-2 rounded"><p class="text-slate-500">Lembur (appr)</p><p class="font-bold">'+myOT+' jam</p></div>'+
+      '<div class="bg-slate-50 p-2 rounded"><p class="text-slate-500">Slip terbaru</p><p class="font-bold">'+(myPayslip?'Ada':'—')+'</p></div>'+
+    '</div>'+
+    '<div class="flex gap-2 no-print sticky bottom-0 bg-white pt-2">'+
+      '<button onclick="closeModal()" class="flex-1 bg-slate-200 py-2.5 rounded text-sm">Tutup</button>'+
+    '</div>'
+  );
+};
+
+/* ============================================================
+   SIDEBAR DRAWER
+   ============================================================ */
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebar-backdrop');
+  const isOpen = !sb.classList.contains('-translate-x-full');
+  if(isOpen){ closeSidebarDrawer(); }
+  else {
+    sb.classList.remove('-translate-x-full');
+    bd.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+  }
+}
+function closeSidebarDrawer(){
+  document.getElementById('sidebar').classList.add('-translate-x-full');
+  document.getElementById('sidebar-backdrop').classList.add('hidden');
+  document.body.classList.remove('overflow-hidden');
+}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+function fillLogin(u,p){ document.getElementById('inUser').value=u; document.getElementById('inPass').value=p; }
+function doLogin(){
+  const u = document.getElementById('inUser').value.trim();
+  const p = document.getElementById('inPass').value;
+  const usr = state.users.find(x=>x.username===u && x.password===p);
+  if(!usr){
+    const err = document.getElementById('loginErr');
+    err.textContent='Username atau password salah.'; err.classList.remove('hidden'); return;
+  }
+  state.currentUser = { username:usr.username, name:usr.name, role:usr.role,
+    branchId:usr.branchId||null, employeeId:usr.employeeId||null };
+  audit('Login sebagai '+usr.role);
+  persist();
+  showApp();
+}
+function doLogout(){
+  closeSidebarDrawer();
+  audit('Logout');
+  state.currentUser=null; persist();
+  document.getElementById('app-screen').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+}
+
+/* ============================================================
+   MENU
+   ============================================================ */
+const MENUS = {
+  superadmin:[
+    {k:'sa-dash',l:'Dashboard Sistem',i:'📊'},
+    {k:'sa-users',l:'Kelola User',i:'👤'},
+    {k:'sa-branches',l:'Kelola Cabang',i:'🏥'},
+    {k:'sa-master',l:'Master Data',i:'⚙️'},
+    {k:'sa-audit',l:'Audit Log',i:'📜'},
+  ],
+  hrd:[
+    {k:'hrd-dash',l:'Dashboard HR',i:'📊'},
+    {k:'hrd-emp',l:'Data Karyawan',i:'👥'},
+    {k:'hrd-att',l:'Monitoring Absensi',i:'⏰'},
+    {k:'hrd-ot',l:'Approval Lembur',i:'🕒'},
+    {k:'hrd-leave',l:'Approval Cuti/Izin',i:'📝'},
+    {k:'hrd-report',l:'Laporan HR',i:'📈'},
+  ],
+  finance:[
+    {k:'fin-dash',l:'Dashboard Finance',i:'📊'},
+    {k:'fin-payroll',l:'Payroll Run',i:'💰'},
+    {k:'fin-publish',l:'Publish Payslip',i:'📤'},
+    {k:'fin-bank',l:'Bank File',i:'🏦'},
+    {k:'fin-report',l:'Laporan Payroll',i:'📈'},
+  ],
+  manager:[
+    {k:'mgr-dash',l:'Dashboard Cabang',i:'📊'},
+    {k:'mgr-att',l:'Absensi Cabang',i:'⏰'},
+    {k:'mgr-ot',l:'Approval Lembur',i:'🕒'},
+    {k:'mgr-leave',l:'Approval Cuti',i:'📝'},
+    {k:'mgr-team',l:'Tim Saya',i:'👥'},
+  ],
+  employee:[
+    {k:'emp-dash',l:'Dashboard Saya',i:'📊'},
+    {k:'emp-clock',l:'Absensi Saya',i:'⏰'},
+    {k:'emp-ot',l:'Ajukan Lembur',i:'🕒'},
+    {k:'emp-leave',l:'Ajukan Cuti/Izin',i:'📝'},
+    {k:'emp-payslip',l:'Slip Gaji',i:'💵'},
+    {k:'emp-profile',l:'Profil Saya',i:'👤'},
+  ]
+};
+let activeMenu = null;
+
+function showApp(){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.remove('hidden');
+  const u = state.currentUser;
+  document.getElementById('hdrName').textContent = u.name;
+  document.getElementById('hdrRole').textContent = u.role.toUpperCase() + (u.branchId?' · '+branchName(u.branchId):'');
+  renderSidebar();
+  go(MENUS[u.role][0].k);
+}
+
+function renderSidebar(){
+  const u = state.currentUser;
+  const items = MENUS[u.role];
+  document.getElementById('sidebar').innerHTML =
+    '<div class="md:hidden flex justify-between items-center mb-3 pb-3 border-b">'+
+      '<span class="text-xs text-slate-500">Menu</span>'+
+      '<button onclick="closeSidebarDrawer()" class="p-1 rounded hover:bg-slate-100">'+
+        '<svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'+
+      '</button></div>'+
+    items.map(m=>
+      '<button data-menu="'+m.k+'" class="menu-item w-full text-left px-3 py-2.5 md:py-2 rounded text-sm mb-1 hover:bg-slate-100 active:bg-slate-200 '+(activeMenu===m.k?'menu-active':'')+'">'+
+      '<span class="mr-2">'+m.i+'</span>'+m.l+'</button>'
+    ).join('') +
+    '<div class="mt-4 pt-4 border-t text-xs text-slate-400 px-2">© Satwagia HRIS</div>';
+  document.querySelectorAll('.menu-item').forEach(b=>b.onclick=()=>{
+    go(b.dataset.menu);
+    if(window.innerWidth < 768) closeSidebarDrawer();
+  });
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+const VIEWS = {};
+function go(key){
+  activeMenu = key;
+  renderSidebar();
+  const fn = VIEWS[key];
+  document.getElementById('main').innerHTML = fn ? fn() : '<p>Halaman tidak ditemukan.</p>';
+  window.scrollTo(0,0);
+}
+
+/* ============================================================
+   SHARED
+   ============================================================ */
+function statCard(label,val,icon,bg){
+  return '<div class="'+(bg||'bg-white')+' rounded-lg p-3 md:p-4 shadow-sm"><div class="text-xl md:text-2xl">'+icon+'</div>'+
+    '<p class="text-lg md:text-2xl font-bold mt-1 break-words">'+val+'</p><p class="text-[11px] md:text-xs text-slate-500 mt-1">'+label+'</p></div>';
+}
+function tableHead(cols){
+  return '<thead class="bg-slate-50 text-slate-600 text-xs uppercase"><tr>'+
+    cols.map(c=>'<th class="text-left py-2 px-3 font-medium">'+c+'</th>').join('')+'</tr></thead>';
+}
+function scrollHint(){
+  return '<p class="md:hidden text-[11px] text-slate-400 mb-1 flex items-center gap-1"><span>👉</span> Geser tabel untuk lihat semua kolom · Tap baris untuk detail</p>';
+}
+
+/* ============================================================
+   VIEW: SUPER ADMIN
+   ============================================================ */
+VIEWS['sa-dash'] = ()=>{
+  const totalUsers = state.users.length;
+  const totalBranches = state.branches.length;
+  const totalEmp = state.employees.length;
+  const totalPending = state.overtimeRequests.filter(o=>o.status==='pending').length
+    + state.leaveRequests.filter(l=>l.status==='pending').length;
+  const totalPayroll = state.payrollRuns.filter(p=>p.status==='published').reduce((s,p)=>s+p.rows.reduce((a,r)=>a+r.net,0),0);
+
+  return '<h2 class="text-lg md:text-xl font-bold mb-3 md:mb-4">Dashboard Sistem</h2>'+
+    '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">'+
+      statCard('Total User',totalUsers,'👤','bg-blue-50')+
+      statCard('Total Cabang',totalBranches,'🏥','bg-purple-50')+
+      statCard('Karyawan Klinik',totalEmp,'👥','bg-green-50')+
+      statCard('Request Pending',totalPending,'⏳','bg-yellow-50')+
+    '</div>'+
+    '<div class="mb-4 md:mb-6">'+statCard('Total Payroll Published (all-time)',fmt(totalPayroll),'💰','bg-teal-50')+'</div>'+
+    '<div class="bg-white rounded-lg p-3 md:p-4 shadow-sm">'+
+      '<h3 class="font-semibold mb-2 text-sm md:text-base">Ringkasan per Role</h3>'+
+      '<div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">'+
+        ['superadmin','hrd','finance','manager','employee'].map(r=>{
+          const c = state.users.filter(u=>u.role===r).length;
+          return '<div class="p-2 bg-slate-50 rounded"><b class="text-xs md:text-sm">'+r+'</b><div class="text-slate-500 text-[11px]">'+c+' user</div></div>';
+        }).join('')+
+      '</div>'+
+      '<p class="text-xs text-slate-500 mt-3">✓ 66 karyawan klinik (EMP001–EMP066) masing-masing punya akun login sendiri.</p>'+
+    '</div>';
+};
+
+VIEWS['sa-users'] = ()=>{
+  const rows = state.users.map(u=>{
+    const isEmp = !!u.employeeId;
+    const cls = isEmp?'cursor-pointer hover:bg-teal-50':'hover:bg-slate-50';
+    const onclick = isEmp?' onclick="viewEmpDetail(\''+u.employeeId+'\')"':'';
+    return '<tr class="border-b '+cls+'"'+onclick+'><td class="py-2 px-3 font-mono text-xs">'+u.username+'</td>'+
+      '<td class="py-2 px-3">'+u.name+'</td>'+
+      '<td class="py-2 px-3">'+badge(u.role)+'</td>'+
+      '<td class="py-2 px-3 text-slate-500">'+(u.branchId?branchName(u.branchId):'-')+'</td>'+
+      '<td class="py-2 px-3 text-slate-500">'+(u.employeeId||'-')+'</td></tr>';
+  }).join('');
+  return '<div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 mb-3">'+
+    '<h2 class="text-lg md:text-xl font-bold">Kelola User ('+state.users.length+')</h2>'+
+    '<button onclick="showAllEmpCredentials()" class="bg-teal-600 text-white px-3 py-2 rounded text-xs self-start">🔑 Lihat Semua Akun Karyawan</button></div>'+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto max-h-[70vh]"><table class="w-full text-sm">'+
+    tableHead(['Username','Nama','Role','Cabang','Karyawan']) + '<tbody>'+rows+'</tbody></table></div>';
+};
+window.showAllEmpCredentials = ()=>{
+  const emps = state.employees;
+  const rows = emps.map(e=>
+    '<tr class="border-b"><td class="py-1.5 px-2 font-mono text-xs">'+e.id.toLowerCase()+'</td>'+
+    '<td class="py-1.5 px-2 text-xs">emp123</td>'+
+    '<td class="py-1.5 px-2 text-xs">'+e.name+'</td>'+
+    '<td class="py-1.5 px-2 text-xs text-slate-500">'+e.position+' · '+branchName(e.branchId)+'</td></tr>'
+  ).join('');
+  openModal(
+    '<h3 class="font-bold text-base md:text-lg mb-1">🔑 Akun Login 66 Karyawan Klinik</h3>'+
+    '<p class="text-xs text-slate-500 mb-3">Semua password: <b class="font-mono">emp123</b> · Username = ID karyawan lowercase.</p>'+
+    '<div class="max-h-[60vh] overflow-y-auto border rounded">'+
+    '<table class="w-full text-sm"><thead class="bg-slate-50 sticky top-0 text-xs uppercase text-slate-600"><tr>'+
+      '<th class="text-left py-2 px-2">Username</th><th class="text-left py-2 px-2">Password</th>'+
+      '<th class="text-left py-2 px-2">Nama</th><th class="text-left py-2 px-2">Jabatan · Cabang</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="flex gap-2 mt-3 sticky bottom-0 bg-white pt-2">'+
+      '<button onclick="closeModal()" class="flex-1 bg-slate-200 py-2.5 rounded text-sm">Tutup</button></div>'
+  );
+};
+
+VIEWS['sa-branches'] = ()=>{
+  const rows = state.branches.map(b=>{
+    const cnt = state.employees.filter(e=>e.branchId===b.id).length;
+    return '<tr class="border-b hover:bg-slate-50"><td class="py-2 px-3 font-mono">'+b.id+'</td>'+
+      '<td class="py-2 px-3 font-medium">'+b.name+'</td>'+
+      '<td class="py-2 px-3 text-slate-600">'+b.address+'</td>'+
+      '<td class="py-2 px-3">'+b.phone+'</td>'+
+      '<td class="py-2 px-3 text-right">'+cnt+'</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Kelola Cabang ('+state.branches.length+')</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Nama','Alamat','Telp','Karyawan']) + '<tbody>'+rows+'</tbody></table></div>';
+};
+
+VIEWS['sa-master'] = ()=>{
+  const rows = POSITIONS.map(p=>
+    '<tr class="border-b align-top"><td class="py-2 px-3 font-medium">'+p.name+'</td>'+
+    '<td class="py-2 px-3 text-right whitespace-nowrap">'+fmt(p.base)+'</td>'+
+    '<td class="py-2 px-3 text-xs text-slate-600">'+JOBDESCS[p.name]+'</td></tr>'
+  ).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Master Data</h2>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4 mb-4"><h3 class="font-semibold mb-2 text-sm md:text-base">Jabatan · Gaji Pokok · Jobdesc</h3>'+
+    '<div class="overflow-x-auto"><table class="w-full text-sm">'+tableHead(['Jabatan','Gaji Pokok','Jobdesc'])+'<tbody>'+rows+'</tbody></table></div></div>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4"><h3 class="font-semibold mb-2 text-sm md:text-base">Komponen Gaji</h3>'+
+    '<ul class="text-xs md:text-sm text-slate-600 space-y-1.5">'+
+      '<li>✓ Gaji Pokok (per jabatan)</li>'+
+      '<li>✓ Tunjangan Tetap: '+fmt(500000)+'</li>'+
+      '<li>✓ Lembur: (Gaji Pokok/173) × 1.5 × jam lembur</li>'+
+      '<li>✓ Potongan Telat: '+fmt(50000)+' per 60 menit</li>'+
+      '<li>✓ Potongan Alpha: Gaji Pokok/22 per hari</li>'+
+      '<li>✓ BPJS: 2% dari gaji pokok</li>'+
+      '<li>✓ PPh21: 5% jika gaji pokok > 5 juta</li>'+
+    '</ul></div>';
+};
+
+VIEWS['sa-audit'] = ()=>{
+  const rows = state.auditLog.map(l=>
+    '<tr class="border-b"><td class="py-2 px-3 text-xs text-slate-500 whitespace-nowrap">'+new Date(l.ts).toLocaleString('id-ID')+'</td>'+
+    '<td class="py-2 px-3 whitespace-nowrap">'+l.user+'</td>'+
+    '<td class="py-2 px-3">'+l.action+'</td></tr>'
+  ).join('') || '<tr><td colspan="3" class="py-4 text-center text-slate-400">Belum ada log.</td></tr>';
+  return '<div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 mb-3">'+
+    '<h2 class="text-lg md:text-xl font-bold">Audit Log</h2>'+
+    '<button onclick="resetData()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-xs self-start">Reset Semua Data</button></div>'+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto max-h-[70vh]"><table class="w-full text-sm">'+
+    tableHead(['Waktu','User','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.resetData = ()=>{
+  if(confirm('Reset semua data ke kondisi awal? Semua perubahan akan hilang.')){
+    localStorage.removeItem(STORAGE_KEY); location.reload();
+  }
+};
+
+/* ============================================================
+   VIEW: HRD
+   ============================================================ */
+VIEWS['hrd-dash'] = ()=>{
+  const totalEmp = state.employees.length;
+  const todayStr = new Date().toISOString().slice(0,10);
+  const todayAtt = state.attendances.filter(a=>a.date===todayStr);
+  const pendOT = state.overtimeRequests.filter(o=>o.status==='pending');
+  const pendLeave = state.leaveRequests.filter(l=>l.status==='pending');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3 md:mb-4">Dashboard HR</h2>'+
+    '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">'+
+      statCard('Karyawan Klinik',totalEmp,'👥','bg-blue-50')+
+      statCard('Hadir Hari Ini',todayAtt.filter(a=>a.status==='hadir').length,'✅','bg-green-50')+
+      statCard('Pending Lembur',pendOT.length,'🕒','bg-yellow-50')+
+      statCard('Pending Cuti/Izin',pendLeave.length,'📝','bg-purple-50')+
+    '</div>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4">'+
+      '<h3 class="font-semibold mb-2 text-sm md:text-base">5 Karyawan Terbaru</h3>'+
+      '<table class="w-full text-sm"><tbody>'+
+        state.employees.slice(-5).reverse().map(e=>
+          '<tr class="border-b cursor-pointer hover:bg-slate-50" onclick="viewEmpDetail(\''+e.id+'\')"><td class="py-2">'+e.name+'</td><td class="text-slate-500 text-xs">'+e.position+'</td><td class="text-right text-slate-500 text-xs">'+branchName(e.branchId)+'</td></tr>'
+        ).join('')+
+      '</tbody></table></div>';
+};
+
+VIEWS['hrd-emp'] = ()=>{
+  const rows = state.employees.map(e=>
+    '<tr class="border-b hover:bg-teal-50 cursor-pointer" onclick="viewEmpDetail(\''+e.id+'\')">'+
+    '<td class="py-2 px-3 font-mono text-xs">'+e.id+'</td>'+
+    '<td class="py-2 px-3">'+e.name+'</td>'+
+    '<td class="py-2 px-3 text-slate-600">'+e.position+'</td>'+
+    '<td class="py-2 px-3">'+branchName(e.branchId)+'</td>'+
+    '<td class="py-2 px-3 text-right">'+fmt(e.base)+'</td>'+
+    '<td class="py-2 px-3 text-xs text-slate-500">'+e.bankName+' · '+e.bankAccount+'</td></tr>'
+  ).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Data Karyawan ('+state.employees.length+')</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto max-h-[70vh]"><table class="w-full text-sm">'+
+    tableHead(['ID','Nama','Jabatan','Cabang','Gaji Pokok','Rekening'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+
+VIEWS['hrd-att'] = ()=>{
+  const todayStr = new Date().toISOString().slice(0,10);
+  const todays = state.attendances.filter(a=>a.date===todayStr);
+  const rows = todays.slice(0,50).map(a=>{
+    const e = empById(a.empId) || {};
+    return '<tr class="border-b hover:bg-slate-50"><td class="py-2 px-3 font-mono text-xs">'+a.empId+'</td>'+
+      '<td class="py-2 px-3">'+e.name+'</td>'+
+      '<td class="py-2 px-3">'+branchName(e.branchId)+'</td>'+
+      '<td class="py-2 px-3 font-mono">'+a.inTime+'</td>'+
+      '<td class="py-2 px-3 font-mono">'+a.outTime+'</td>'+
+      '<td class="py-2 px-3">'+badge(a.status)+(a.lateMinutes?' <span class="text-yellow-600 text-xs">('+a.lateMinutes+'m)</span>':'')+'</td>'+
+      '<td class="py-2 px-3"><button onclick="correctAttendance(\''+a.id+'\')" class="inline-btn text-xs text-teal-600 hover:underline">Koreksi</button></td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-2">Monitoring Absensi</h2>'+
+    '<p class="text-xs md:text-sm text-slate-500 mb-3">'+fmtDate(todayStr)+' · '+Math.min(50,todays.length)+' dari '+todays.length+' record</p>'+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Nama','Cabang','In','Out','Status','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.correctAttendance = id=>{
+  const a = state.attendances.find(x=>x.id===id);
+  if(!a) return;
+  openModal(
+    '<h3 class="font-bold text-base md:text-lg mb-3">Koreksi Absensi</h3>'+
+    '<p class="text-sm text-slate-500 mb-3">'+empById(a.empId).name+' — '+a.date+'</p>'+
+    '<div class="space-y-3 text-sm">'+
+      '<div><label class="text-xs text-slate-600">Status</label><select id="cStatus" class="w-full border rounded px-3 py-2 mt-1">'+
+        ['hadir','izin','sakit','alpha'].map(s=>'<option '+(a.status===s?'selected':'')+'>'+s+'</option>').join('')+
+      '</select></div>'+
+      '<div class="grid grid-cols-2 gap-2">'+
+        '<div><label class="text-xs text-slate-600">In</label><input id="cIn" value="'+a.inTime+'" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+        '<div><label class="text-xs text-slate-600">Out</label><input id="cOut" value="'+a.outTime+'" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+      '</div>'+
+      '<div><label class="text-xs text-slate-600">Late (menit)</label><input id="cLate" type="number" value="'+(a.lateMinutes||0)+'" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+    '</div>'+
+    '<div class="flex gap-2 mt-4 sticky bottom-0 bg-white pt-2"><button onclick="saveCorrection(\''+id+'\')" class="flex-1 bg-teal-600 text-white py-2.5 rounded">Simpan</button>'+
+    '<button onclick="closeModal()" class="flex-1 bg-slate-200 py-2.5 rounded">Batal</button></div>'
+  );
+};
+window.saveCorrection = id=>{
+  const a = state.attendances.find(x=>x.id===id);
+  a.status = document.getElementById('cStatus').value;
+  a.inTime = document.getElementById('cIn').value;
+  a.outTime = document.getElementById('cOut').value;
+  a.lateMinutes = parseInt(document.getElementById('cLate').value)||0;
+  a.correctedBy = state.currentUser.name;
+  audit('Koreksi absensi '+a.empId+' tanggal '+a.date);
+  persist(); closeModal(); toast('Absensi dikoreksi'); go('hrd-att');
+};
+
+VIEWS['hrd-ot'] = ()=>{
+  const list = state.overtimeRequests;
+  const rows = list.map(o=>{
+    const e = empById(o.empId)||{};
+    return '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+o.id+'</td>'+
+      '<td class="py-2 px-3">'+e.name+'</td>'+
+      '<td class="py-2 px-3">'+branchName(o.branchId)+'</td>'+
+      '<td class="py-2 px-3">'+fmtDate(o.date)+'</td>'+
+      '<td class="py-2 px-3">'+o.hours+'j</td>'+
+      '<td class="py-2 px-3">'+o.reason+'</td>'+
+      '<td class="py-2 px-3">'+badge(o.status)+'</td>'+
+      '<td class="py-2 px-3 whitespace-nowrap">'+(o.status==='pending'?'<button onclick="approveOT(\''+o.id+'\')" class="inline-btn text-xs bg-green-600 text-white px-2 py-1 rounded mr-1">✓</button><button onclick="rejectOT(\''+o.id+'\')" class="inline-btn text-xs bg-red-600 text-white px-2 py-1 rounded">✕</button>':'-')+'</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Approval Lembur</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Karyawan','Cabang','Tanggal','Jam','Alasan','Status','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.approveOT = id=>{ const o=state.overtimeRequests.find(x=>x.id===id); if(!o)return;
+  o.status='approved'; o.approvedBy=state.currentUser.name; o.approvedAt=new Date().toISOString();
+  audit('Approve lembur '+id+' oleh '+state.currentUser.name); persist();
+  toast('Lembur '+id+' disetujui'); go(state.currentUser.role==='manager'?'mgr-ot':'hrd-ot');
+};
+window.rejectOT = id=>{ const o=state.overtimeRequests.find(x=>x.id===id); if(!o)return;
+  o.status='rejected'; o.approvedBy=state.currentUser.name;
+  audit('Reject lembur '+id); persist(); toast('Lembur ditolak','warn');
+  go(state.currentUser.role==='manager'?'mgr-ot':'hrd-ot');
+};
+
+VIEWS['hrd-leave'] = ()=>{
+  const rows = state.leaveRequests.map(l=>{
+    const e = empById(l.empId)||{};
+    return '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+l.id+'</td>'+
+      '<td class="py-2 px-3">'+e.name+'</td>'+
+      '<td class="py-2 px-3">'+branchName(l.branchId)+'</td>'+
+      '<td class="py-2 px-3">'+l.type+'</td>'+
+      '<td class="py-2 px-3 whitespace-nowrap">'+fmtDate(l.startDate)+' — '+fmtDate(l.endDate)+'</td>'+
+      '<td class="py-2 px-3">'+badge(l.status)+'</td>'+
+      '<td class="py-2 px-3 whitespace-nowrap">'+(l.status==='pending'?'<button onclick="approveLeave(\''+l.id+'\')" class="inline-btn text-xs bg-green-600 text-white px-2 py-1 rounded mr-1">✓</button><button onclick="rejectLeave(\''+l.id+'\')" class="inline-btn text-xs bg-red-600 text-white px-2 py-1 rounded">✕</button>':'-')+'</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Approval Cuti/Izin</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Karyawan','Cabang','Tipe','Tanggal','Status','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.approveLeave = id=>{ const l=state.leaveRequests.find(x=>x.id===id); if(!l)return;
+  l.status='approved'; l.approvedBy=state.currentUser.name;
+  audit('Approve cuti '+id); persist(); toast('Cuti disetujui');
+  go(state.currentUser.role==='manager'?'mgr-leave':'hrd-leave');
+};
+window.rejectLeave = id=>{ const l=state.leaveRequests.find(x=>x.id===id); if(!l)return;
+  l.status='rejected'; l.approvedBy=state.currentUser.name;
+  audit('Reject cuti '+id); persist(); toast('Cuti ditolak','warn');
+  go(state.currentUser.role==='manager'?'mgr-leave':'hrd-leave');
+};
+
+VIEWS['hrd-report'] = ()=>{
+  const perBranch = state.branches.map(b=>{
+    const emps = state.employees.filter(e=>e.branchId===b.id);
+    const todayStr = new Date().toISOString().slice(0,10);
+    const today = state.attendances.filter(a=>a.date===todayStr && emps.some(e=>e.id===a.empId));
+    const hadir = today.filter(a=>a.status==='hadir').length;
+    const ot = state.overtimeRequests.filter(o=>o.branchId===b.id && o.status==='approved').reduce((s,o)=>s+o.hours,0);
+    return {name:b.name,total:emps.length,hadir,ot,pct:emps.length?Math.round(hadir/emps.length*100):0};
+  });
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Laporan HR per Cabang</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4 overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['Cabang','Karyawan','Hadir','%','Lembur'])+
+    '<tbody>'+perBranch.map(b=>'<tr class="border-b"><td class="py-2 px-3">'+b.name+'</td>'+
+      '<td class="py-2 px-3">'+b.total+'</td><td class="py-2 px-3">'+b.hadir+'</td>'+
+      '<td class="py-2 px-3">'+b.pct+'%</td><td class="py-2 px-3">'+b.ot+'j</td></tr>').join('')+
+    '</tbody></table></div>';
+};
+
+/* ============================================================
+   VIEW: FINANCE
+   ============================================================ */
+VIEWS['fin-dash'] = ()=>{
+  const runs = state.payrollRuns;
+  const published = runs.filter(r=>r.status==='published');
+  const total = published.reduce((s,p)=>s+p.rows.reduce((a,r)=>a+r.net,0),0);
+  return '<h2 class="text-lg md:text-xl font-bold mb-3 md:mb-4">Dashboard Finance</h2>'+
+    '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">'+
+      statCard('Payroll Run',runs.length,'📋','bg-blue-50')+
+      statCard('Published',published.length,'✅','bg-green-50')+
+      statCard('Total Net',fmt(total),'💵','bg-teal-50')+
+      statCard('Karyawan',state.employees.length,'👥','bg-purple-50')+
+    '</div>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4 overflow-x-auto"><h3 class="font-semibold mb-2 text-sm md:text-base">Payroll Runs</h3>'+
+    '<table class="w-full text-sm">'+tableHead(['Periode','Status','Total Net','Published'])+
+    '<tbody>'+runs.map(r=>'<tr class="border-b"><td class="py-2 px-3">'+r.period+'</td>'+
+      '<td class="py-2 px-3">'+badge(r.status)+'</td>'+
+      '<td class="py-2 px-3 text-right">'+fmt(r.rows.reduce((s,x)=>s+x.net,0))+'</td>'+
+      '<td class="py-2 px-3 text-xs text-slate-500">'+(r.publishedAt?new Date(r.publishedAt).toLocaleDateString('id-ID'):'-')+'</td></tr>').join('')+
+    '</tbody></table></div>';
+};
+
+VIEWS['fin-payroll'] = ()=>{
+  const cur = new Date().toISOString().slice(0,7);
+  const existing = state.payrollRuns.find(r=>r.period===cur);
+  if(existing){ return renderPayrollDetail(existing); }
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Payroll Run</h2>'+
+    '<div class="bg-white rounded-lg shadow-sm p-6 md:p-8 text-center">'+
+      '<p class="text-slate-500 mb-2 text-sm">Belum ada payroll run untuk <b>'+cur+'</b>.</p>'+
+      '<p class="text-xs text-slate-400 mb-4">Data dari absensi + lembur approved.</p>'+
+      '<button onclick="runPayroll(\''+cur+'\')" class="bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-6 py-3 rounded font-medium w-full md:w-auto">▶ Jalankan Payroll</button>'+
+    '</div>';
+};
+function renderPayrollDetail(pr){
+  const rows = pr.rows.map(r=>
+    '<tr class="border-b hover:bg-slate-50 cursor-pointer" onclick="viewPayrollRow(\''+pr.id+'\',\''+r.empId+'\')">'+
+    '<td class="py-2 px-3 font-mono text-xs">'+r.empId+'</td>'+
+    '<td class="py-2 px-3">'+r.name+'</td>'+
+    '<td class="py-2 px-3 text-slate-600 text-xs">'+branchName(r.branchId)+'</td>'+
+    '<td class="py-2 px-3 text-right">'+fmt(r.gross)+'</td>'+
+    '<td class="py-2 px-3 text-right text-red-600">-'+fmt(r.deductions)+'</td>'+
+    '<td class="py-2 px-3 text-right font-semibold">'+fmt(r.net)+'</td></tr>'
+  ).join('');
+  const totalNet = pr.rows.reduce((s,r)=>s+r.net,0);
+  const totalGross = pr.rows.reduce((s,r)=>s+r.gross,0);
+  const totalDed = pr.rows.reduce((s,r)=>s+r.deductions,0);
+  const actions = pr.status==='draft'
+    ? '<button onclick="finalizePayroll(\''+pr.id+'\')" class="bg-blue-600 text-white px-4 py-2 rounded text-sm w-full md:w-auto">🔒 Finalize</button>'
+    : (pr.status==='finalized'
+      ? '<button onclick="publishPayroll(\''+pr.id+'\')" class="bg-green-600 text-white px-4 py-2 rounded text-sm w-full md:w-auto">📤 Publish Payslip</button>'
+      : '<span class="bg-green-100 text-green-700 px-3 py-2 rounded text-sm inline-block">✓ Published</span>');
+  return '<div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 mb-4">'+
+    '<h2 class="text-lg md:text-xl font-bold">Payroll — '+pr.period+'</h2>'+
+    '<div class="flex gap-2 items-center flex-wrap">'+badge(pr.status)+actions+'</div></div>'+
+    '<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">'+
+      '<div class="bg-white p-3 rounded shadow-sm"><p class="text-xs text-slate-500">Total Gross</p><p class="text-base md:text-lg font-bold">'+fmt(totalGross)+'</p></div>'+
+      '<div class="bg-white p-3 rounded shadow-sm"><p class="text-xs text-slate-500">Total Potongan</p><p class="text-base md:text-lg font-bold text-red-600">-'+fmt(totalDed)+'</p></div>'+
+      '<div class="bg-teal-50 p-3 rounded shadow-sm"><p class="text-xs text-slate-500">Total Net</p><p class="text-base md:text-lg font-bold text-teal-700">'+fmt(totalNet)+'</p></div>'+
+    '</div>'+
+    '<p class="text-xs text-slate-500 mb-2">💡 Tap baris untuk lihat slip & detail perhitungan.</p>'+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto max-h-[60vh]"><table class="w-full text-sm">'+
+    tableHead(['ID','Nama','Cabang','Gross','Potongan','Net'])+'<tbody>'+rows+'</tbody></table></div>';
+}
+window.runPayroll = period=>{
+  const rows = computeRowsForPeriod(state, period);
+  const run = {
+    id:'PR-'+period, period, rows, status:'draft',
+    createdBy:state.currentUser.name, createdAt:new Date().toISOString(),
+    finalizedAt:null, publishedAt:null
+  };
+  state.payrollRuns.push(run);
+  audit('Run payroll '+period);
+  persist(); toast('Payroll run dibuat'); go('fin-payroll');
+};
+window.finalizePayroll = id=>{
+  const pr = state.payrollRuns.find(r=>r.id===id); if(!pr||pr.status!=='draft')return;
+  pr.status='finalized'; pr.finalizedAt=new Date().toISOString();
+  audit('Finalize payroll '+pr.period); persist();
+  toast('Payroll difinalisasi. Data terkunci.'); go('fin-payroll');
+};
+window.publishPayroll = id=>{
+  const pr = state.payrollRuns.find(r=>r.id===id); if(!pr||pr.status!=='finalized')return;
+  pr.status='published'; pr.publishedAt=new Date().toISOString();
+  audit('Publish payslip '+pr.period); persist();
+  toast('✓ Payslip dipublish — karyawan bisa akses.');
+  go('fin-payroll');
+};
+window.viewPayrollRow = (prId,empId)=>{
+  const pr = state.payrollRuns.find(r=>r.id===prId);
+  const r = pr.rows.find(x=>x.empId===empId);
+  if(!r) return;
+  openModal(renderPayslip(pr,r,false));
+};
+
+function renderPayslip(pr,r,printable){
+  return '<div class="border-b pb-3 mb-3 flex items-center gap-2">'+
+    '<span class="text-2xl">🐾</span><div><h3 class="font-bold text-base md:text-lg leading-none">Klinik Satwagia</h3>'+
+    '<p class="text-xs text-slate-500">Slip Gaji — '+pr.period+'</p></div></div>'+
+    '<div class="grid grid-cols-2 gap-2 text-xs md:text-sm mb-3">'+
+      '<div><span class="text-slate-500">Nama:</span> <b>'+r.name+'</b></div>'+
+      '<div><span class="text-slate-500">ID:</span> '+r.empId+'</div>'+
+      '<div><span class="text-slate-500">Jabatan:</span> '+r.position+'</div>'+
+      '<div><span class="text-slate-500">Cabang:</span> '+branchName(r.branchId)+'</div>'+
+      '<div class="col-span-2"><span class="text-slate-500">Rek:</span> '+r.bankName+' · '+r.bankAccount+'</div>'+
+    '</div>'+
+    '<table class="w-full text-xs md:text-sm mb-3">'+
+      '<tr><td class="py-1">Gaji Pokok</td><td class="text-right py-1">'+fmt(r.base)+'</td></tr>'+
+      '<tr><td class="py-1">Tunjangan</td><td class="text-right py-1">'+fmt(r.allowance)+'</td></tr>'+
+      '<tr><td class="py-1">Lembur ('+r.otHours+'j)</td><td class="text-right py-1">'+fmt(r.overtimePay)+'</td></tr>'+
+      '<tr class="border-t"><td class="font-semibold pt-2">Gross</td><td class="text-right font-semibold pt-2">'+fmt(r.gross)+'</td></tr>'+
+      '<tr><td class="text-red-600 py-1">Telat ('+r.lateMinutes+'m)</td><td class="text-right text-red-600 py-1">-'+fmt(r.lateDeduction)+'</td></tr>'+
+      '<tr><td class="text-red-600 py-1">Alpha ('+r.alpha+'h)</td><td class="text-right text-red-600 py-1">-'+fmt(r.absenceDeduction)+'</td></tr>'+
+      '<tr><td class="text-red-600 py-1">BPJS</td><td class="text-right text-red-600 py-1">-'+fmt(r.bpjs)+'</td></tr>'+
+      '<tr><td class="text-red-600 py-1">PPh 21</td><td class="text-right text-red-600 py-1">-'+fmt(r.pph21)+'</td></tr>'+
+      '<tr class="border-t"><td class="font-bold pt-2">Take Home</td><td class="text-right font-bold pt-2 text-teal-700">'+fmt(r.net)+'</td></tr>'+
+    '</table>'+
+    '<p class="text-xs text-slate-500 mb-3">Status: '+badge(pr.status)+
+      (pr.publishedAt?' · '+new Date(pr.publishedAt).toLocaleString('id-ID'):'')+'</p>'+
+    '<div class="flex gap-2 no-print sticky bottom-0 bg-white pt-2 -mx-4 md:-mx-6 px-4 md:px-6 pb-1">'+
+      (printable?'':'<button onclick="window.print()" class="flex-1 bg-teal-600 text-white py-2.5 rounded text-sm">🖨️ Cetak</button>')+
+      '<button onclick="closeModal()" class="flex-1 bg-slate-200 py-2.5 rounded text-sm">Tutup</button></div>';
+}
+
+VIEWS['fin-publish'] = ()=>{
+  const runs = state.payrollRuns.filter(r=>r.status==='finalized' || r.status==='published');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Publish Payslip</h2>'+
+    '<p class="text-xs md:text-sm text-slate-500 mb-3">Publish setelah finalize. Karyawan langsung bisa akses.</p>'+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['Periode','Status','Karyawan','Aksi'])+'<tbody>'+
+    runs.map(r=>'<tr class="border-b"><td class="py-2 px-3">'+r.period+'</td>'+
+      '<td class="py-2 px-3">'+badge(r.status)+'</td>'+
+      '<td class="py-2 px-3">'+r.rows.length+'</td>'+
+      '<td class="py-2 px-3">'+(r.status==='finalized'
+        ?'<button onclick="publishPayroll(\''+r.id+'\')" class="inline-btn text-xs bg-green-600 text-white px-3 py-1.5 rounded">Publish</button>'
+        :'<span class="text-xs text-green-600">✓ Done</span>')+'</td></tr>').join('')+
+    '</tbody></table></div>';
+};
+
+VIEWS['fin-bank'] = ()=>{
+  const runs = state.payrollRuns.filter(r=>r.status==='finalized'||r.status==='published');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Bank File / Transfer</h2>'+
+    '<p class="text-xs md:text-sm text-slate-500 mb-3">Download CSV untuk transfer bank.</p>'+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['Periode','Status','Total','Aksi'])+'<tbody>'+
+    runs.map(r=>'<tr class="border-b"><td class="py-2 px-3">'+r.period+'</td>'+
+      '<td class="py-2 px-3">'+badge(r.status)+'</td>'+
+      '<td class="py-2 px-3 text-right">'+fmt(r.rows.reduce((s,x)=>s+x.net,0))+'</td>'+
+      '<td class="py-2 px-3"><button onclick="downloadBankFile(\''+r.id+'\')" class="inline-btn text-xs bg-blue-600 text-white px-3 py-1.5 rounded whitespace-nowrap">⬇️ CSV</button></td></tr>').join('')+
+    '</tbody></table></div>';
+};
+window.downloadBankFile = prId=>{
+  const pr = state.payrollRuns.find(r=>r.id===prId); if(!pr) return;
+  const rows = [['No','Bank','No Rekening','Nama','Nominal','Berita']];
+  pr.rows.forEach((r,i)=>{
+    rows.push([i+1, r.bankName, r.bankAccount, r.name, r.net, 'Gaji '+pr.period]);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='payroll-'+pr.period+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+  audit('Download bank file '+pr.period);
+  toast('CSV berhasil diunduh');
+};
+
+VIEWS['fin-report'] = ()=>{
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Laporan Payroll</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['Periode','Status','Gross','Potongan','Net','Published'])+'<tbody>'+
+    state.payrollRuns.map(r=>{
+      const g = r.rows.reduce((s,x)=>s+x.gross,0);
+      const d = r.rows.reduce((s,x)=>s+x.deductions,0);
+      const n = r.rows.reduce((s,x)=>s+x.net,0);
+      return '<tr class="border-b"><td class="py-2 px-3">'+r.period+'</td>'+
+        '<td class="py-2 px-3">'+badge(r.status)+'</td>'+
+        '<td class="py-2 px-3 text-right">'+fmt(g)+'</td>'+
+        '<td class="py-2 px-3 text-right text-red-600">-'+fmt(d)+'</td>'+
+        '<td class="py-2 px-3 text-right font-semibold">'+fmt(n)+'</td>'+
+        '<td class="py-2 px-3 text-xs text-slate-500">'+(r.publishedAt?new Date(r.publishedAt).toLocaleDateString('id-ID'):'-')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+};
+
+/* ============================================================
+   VIEW: MANAGER
+   ============================================================ */
+function mgrBranch(){ return state.currentUser.branchId; }
+function mgrEmps(){ return state.employees.filter(e=>e.branchId===mgrBranch()); }
+
+VIEWS['mgr-dash'] = ()=>{
+  const br = mgrBranch();
+  const emps = mgrEmps();
+  const todayStr = new Date().toISOString().slice(0,10);
+  const today = state.attendances.filter(a=>a.date===todayStr && emps.some(e=>e.id===a.empId));
+  const pendOT = state.overtimeRequests.filter(o=>o.branchId===br && o.status==='pending');
+  const pendLV = state.leaveRequests.filter(l=>l.branchId===br && l.status==='pending');
+  return '<h2 class="text-lg md:text-xl font-bold mb-1">'+branchName(br)+'</h2>'+
+    '<p class="text-xs md:text-sm text-slate-500 mb-3 md:mb-4">Manager: '+state.currentUser.name+'</p>'+
+    '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">'+
+      statCard('Tim Saya',emps.length,'👥','bg-blue-50')+
+      statCard('Hadir Hari Ini',today.filter(a=>a.status==='hadir').length,'✅','bg-green-50')+
+      statCard('Pending Lembur',pendOT.length,'🕒','bg-yellow-50')+
+      statCard('Pending Cuti',pendLV.length,'📝','bg-purple-50')+
+    '</div>';
+};
+
+VIEWS['mgr-att'] = ()=>{
+  const todayStr = new Date().toISOString().slice(0,10);
+  const emps = mgrEmps();
+  const todays = state.attendances.filter(a=>a.date===todayStr && emps.some(e=>e.id===a.empId));
+  const rows = todays.map(a=>{
+    const e = empById(a.empId);
+    return '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+a.empId+'</td>'+
+      '<td class="py-2 px-3">'+e.name+'</td>'+
+      '<td class="py-2 px-3 font-mono">'+a.inTime+'</td>'+
+      '<td class="py-2 px-3 font-mono">'+a.outTime+'</td>'+
+      '<td class="py-2 px-3">'+badge(a.status)+(a.lateMinutes?' ('+a.lateMinutes+'m)':'')+'</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Absensi '+branchName(mgrBranch())+'</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Nama','In','Out','Status'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+
+VIEWS['mgr-ot'] = ()=>{
+  const br = mgrBranch();
+  const list = state.overtimeRequests.filter(o=>o.branchId===br);
+  const rows = list.map(o=>{
+    const e = empById(o.empId);
+    return '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+o.id+'</td>'+
+      '<td class="py-2 px-3">'+e.name+'</td>'+
+      '<td class="py-2 px-3">'+fmtDate(o.date)+'</td>'+
+      '<td class="py-2 px-3">'+o.hours+'j</td>'+
+      '<td class="py-2 px-3">'+badge(o.status)+'</td>'+
+      '<td class="py-2 px-3 whitespace-nowrap">'+(o.status==='pending'?'<button onclick="approveOT(\''+o.id+'\')" class="inline-btn text-xs bg-green-600 text-white px-2 py-1 rounded mr-1">✓</button><button onclick="rejectOT(\''+o.id+'\')" class="inline-btn text-xs bg-red-600 text-white px-2 py-1 rounded">✕</button>':'-')+'</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Approval Lembur — '+branchName(br)+'</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Karyawan','Tanggal','Jam','Status','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+
+VIEWS['mgr-leave'] = ()=>{
+  const br = mgrBranch();
+  const list = state.leaveRequests.filter(l=>l.branchId===br);
+  const rows = list.map(l=>{
+    const e = empById(l.empId);
+    return '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+l.id+'</td>'+
+      '<td class="py-2 px-3">'+e.name+'</td>'+
+      '<td class="py-2 px-3">'+l.type+'</td>'+
+      '<td class="py-2 px-3 whitespace-nowrap">'+fmtDate(l.startDate)+'</td>'+
+      '<td class="py-2 px-3">'+badge(l.status)+'</td>'+
+      '<td class="py-2 px-3 whitespace-nowrap">'+(l.status==='pending'?'<button onclick="approveLeave(\''+l.id+'\')" class="inline-btn text-xs bg-green-600 text-white px-2 py-1 rounded mr-1">✓</button><button onclick="rejectLeave(\''+l.id+'\')" class="inline-btn text-xs bg-red-600 text-white px-2 py-1 rounded">✕</button>':'-')+'</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Approval Cuti — '+branchName(br)+'</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Karyawan','Tipe','Mulai','Status','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+
+VIEWS['mgr-team'] = ()=>{
+  const emps = mgrEmps();
+  const rows = emps.map(e=>
+    '<tr class="border-b hover:bg-teal-50 cursor-pointer" onclick="viewEmpDetail(\''+e.id+'\')">'+
+    '<td class="py-2 px-3 font-mono text-xs">'+e.id+'</td>'+
+    '<td class="py-2 px-3">'+e.name+'</td>'+
+    '<td class="py-2 px-3 text-slate-600 text-xs">'+e.position+'</td>'+
+    '<td class="py-2 px-3 text-xs">'+e.bankName+' · '+e.bankAccount+'</td></tr>'
+  ).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Tim Saya ('+emps.length+')</h2>'+scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Nama','Jabatan','Rek'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+
+/* ============================================================
+   VIEW: EMPLOYEE
+   ============================================================ */
+function me(){ return empById(state.currentUser.employeeId); }
+
+VIEWS['emp-dash'] = ()=>{
+  const e = me();
+  const todayStr = new Date().toISOString().slice(0,10);
+  const myAtt = state.attendances.filter(a=>a.empId===e.id && a.date===todayStr);
+  const att = myAtt[0];
+  const myOT = state.overtimeRequests.filter(o=>o.empId===e.id);
+  const myLV = state.leaveRequests.filter(l=>l.empId===e.id);
+  const myPayslips = state.payrollRuns.filter(r=>r.status==='published' && r.rows.some(x=>x.empId===e.id));
+  return '<h2 class="text-lg md:text-xl font-bold mb-1">Hai, '+e.name.split(' ')[0]+' 👋</h2>'+
+    '<p class="text-xs md:text-sm text-slate-500 mb-3 md:mb-4">'+e.position+' · '+branchName(e.branchId)+'</p>'+
+    '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">'+
+      statCard('Hari Ini', att?(att.status==='hadir'?att.inTime:'Izin'):'Belum','⏰',att?'bg-green-50':'bg-red-50')+
+      statCard('Lembur', myOT.length,'🕒','bg-yellow-50')+
+      statCard('Cuti/Izin', myLV.length,'📝','bg-purple-50')+
+      statCard('Slip Gaji', myPayslips.length,'💵','bg-teal-50')+
+    '</div>'+
+    '<div class="bg-teal-50 rounded-lg p-3 mb-4">'+
+      '<p class="text-xs font-semibold text-teal-800 mb-1">📋 Jobdesc Saya — '+e.position+'</p>'+
+      '<p class="text-xs md:text-sm text-slate-700 leading-relaxed">'+e.jobdesc+'</p>'+
+    '</div>'+
+    '<div class="grid md:grid-cols-2 gap-3 md:gap-4">'+
+      '<div class="bg-white rounded-lg p-3 md:p-4 shadow-sm"><h3 class="font-semibold mb-2 text-sm md:text-base">Slip Gaji Terbaru</h3>'+
+        (myPayslips.length?myPayslips.slice(-1).map(pr=>{
+          const r = pr.rows.find(x=>x.empId===e.id);
+          return '<div class="text-sm"><p class="text-xs text-slate-500">Periode <b>'+pr.period+'</b></p><p class="text-xl md:text-2xl font-bold text-teal-700 mt-1">'+fmt(r.net)+'</p>'+
+            '<button onclick="viewMyPayslip(\''+pr.id+'\')" class="mt-2 text-xs bg-teal-600 text-white px-3 py-1.5 rounded">Lihat Slip</button></div>';
+        }).join(''):'<p class="text-sm text-slate-400">Belum ada slip.</p>')+
+      '</div>'+
+      '<div class="bg-white rounded-lg p-3 md:p-4 shadow-sm"><h3 class="font-semibold mb-2 text-sm md:text-base">Request Terakhir</h3>'+
+        '<ul class="text-xs md:text-sm space-y-1.5">'+
+        [...myOT.slice(-2).map(o=>'<li class="flex justify-between gap-2"><span>🕒 Lembur '+o.hours+'j · '+fmtDate(o.date)+'</span>'+badge(o.status)+'</li>'),
+         ...myLV.slice(-2).map(l=>'<li class="flex justify-between gap-2"><span>📝 '+l.type+' · '+fmtDate(l.startDate)+'</span>'+badge(l.status)+'</li>')].join('')||
+        '<li class="text-slate-400">Belum ada request</li>'+
+        '</ul></div>'+
+    '</div>';
+};
+
+VIEWS['emp-clock'] = ()=>{
+  const e = me();
+  const todayStr = new Date().toISOString().slice(0,10);
+  const todayAtt = state.attendances.find(a=>a.empId===e.id && a.date===todayStr);
+  const last7 = state.attendances.filter(a=>a.empId===e.id).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15);
+  const clockBtn = todayAtt
+    ? '<div class="bg-green-50 p-3 md:p-4 rounded mb-4"><p class="text-xs text-slate-600">Absensi hari ini:</p>'+
+      '<p class="text-sm md:text-base font-bold mt-1">'+badge(todayAtt.status)+' · In: '+todayAtt.inTime+' — Out: '+(todayAtt.outTime==='-'?'-':todayAtt.outTime)+'</p></div>'
+    : '<button onclick="doClockIn()" class="w-full bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-6 py-3 rounded font-medium mb-4 text-base">📸 Clock In Sekarang</button>';
+  const rows = last7.map(a=>
+    '<tr class="border-b"><td class="py-2 px-3 whitespace-nowrap">'+fmtDate(a.date)+'</td>'+
+    '<td class="py-2 px-3 font-mono">'+a.inTime+'</td>'+
+    '<td class="py-2 px-3 font-mono">'+a.outTime+'</td>'+
+    '<td class="py-2 px-3">'+badge(a.status)+(a.lateMinutes?' ('+a.lateMinutes+'m)':'')+'</td></tr>'
+  ).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Absensi Saya</h2>'+clockBtn+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['Tanggal','In','Out','Status'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.doClockIn = ()=>{
+  const e = me();
+  const todayStr = new Date().toISOString().slice(0,10);
+  if(state.attendances.find(a=>a.empId===e.id && a.date===todayStr)){
+    toast('Anda sudah clock in hari ini','warn'); return;
+  }
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const late = Math.max(0, (now.getHours()*60+now.getMinutes()) - (8*60));
+  state.attendances.push({
+    id:'ATT'+todayStr.replace(/-/g,'')+e.id+'-live',
+    empId:e.id, date:todayStr, inTime:hhmm, outTime:'-',
+    lateMinutes:late, status:'hadir', source:'self-clockin',
+    gps:'-6.2, 106.8', selfie:true
+  });
+  audit('Clock in '+e.id); persist();
+  toast('✓ Clock in berhasil — '+hhmm+' (GPS valid)');
+  go('emp-clock');
+};
+
+VIEWS['emp-ot'] = ()=>{
+  const e = me();
+  const myOT = state.overtimeRequests.filter(o=>o.empId===e.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const rows = myOT.map(o=>
+    '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+o.id+'</td>'+
+    '<td class="py-2 px-3 whitespace-nowrap">'+fmtDate(o.date)+'</td>'+
+    '<td class="py-2 px-3">'+o.hours+'j</td>'+
+    '<td class="py-2 px-3 text-xs">'+o.reason+'</td>'+
+    '<td class="py-2 px-3">'+badge(o.status)+'</td></tr>'
+  ).join('') || '<tr><td colspan="5" class="py-4 text-center text-slate-400 text-sm">Belum ada pengajuan.</td></tr>';
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Ajukan Lembur</h2>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4 mb-4">'+
+      '<h3 class="font-semibold mb-3 text-xs md:text-sm text-slate-600">Form Pengajuan</h3>'+
+      '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 text-sm">'+
+        '<div class="col-span-2 md:col-span-1"><label class="text-xs text-slate-600">Tanggal</label><input id="otDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+        '<div><label class="text-xs text-slate-600">Jam</label><input id="otHours" type="number" step="0.5" min="0.5" value="2" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+        '<div class="col-span-2 md:col-span-3"><label class="text-xs text-slate-600">Alasan</label><input id="otReason" type="text" placeholder="Contoh: extra shift" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+      '</div>'+
+      '<button onclick="submitOT()" class="mt-3 w-full md:w-auto bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-4 py-2.5 rounded text-sm">Ajukan Lembur</button>'+
+    '</div>'+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Tanggal','Jam','Alasan','Status'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.submitOT = ()=>{
+  const e = me();
+  const h = parseFloat(document.getElementById('otHours').value);
+  const date = document.getElementById('otDate').value;
+  const reason = document.getElementById('otReason').value||'-';
+  if(!date||!h){ toast('Lengkapi form','err'); return; }
+  const newId = 'OT'+String(state.overtimeRequests.length+1).padStart(3,'0');
+  state.overtimeRequests.push({
+    id:newId, empId:e.id, branchId:e.branchId,
+    date, hours:h, reason, status:'pending',
+    approvedBy:null, approvedAt:null, createdAt:new Date().toISOString()
+  });
+  audit('Ajukan lembur '+newId+' oleh '+e.id); persist();
+  toast('Lembur diajukan — menunggu approval');
+  go('emp-ot');
+};
+
+VIEWS['emp-leave'] = ()=>{
+  const e = me();
+  const myLV = state.leaveRequests.filter(l=>l.empId===e.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const rows = myLV.map(l=>
+    '<tr class="border-b"><td class="py-2 px-3 font-mono text-xs">'+l.id+'</td>'+
+    '<td class="py-2 px-3">'+l.type+'</td>'+
+    '<td class="py-2 px-3 text-xs whitespace-nowrap">'+fmtDate(l.startDate)+'</td>'+
+    '<td class="py-2 px-3 text-xs">'+l.reason+'</td>'+
+    '<td class="py-2 px-3">'+badge(l.status)+'</td></tr>'
+  ).join('') || '<tr><td colspan="5" class="py-4 text-center text-slate-400 text-sm">Belum ada pengajuan.</td></tr>';
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Ajukan Cuti / Izin</h2>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-4 mb-4">'+
+      '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 text-sm">'+
+        '<div class="col-span-2 md:col-span-1"><label class="text-xs text-slate-600">Tipe</label><select id="lvType" class="w-full border rounded px-3 py-2 mt-1"><option>cuti</option><option>izin</option><option>sakit</option></select></div>'+
+        '<div><label class="text-xs text-slate-600">Mulai</label><input id="lvStart" type="date" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+        '<div><label class="text-xs text-slate-600">Selesai</label><input id="lvEnd" type="date" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+        '<div class="col-span-2 md:col-span-1"><label class="text-xs text-slate-600">Alasan</label><input id="lvReason" type="text" class="w-full border rounded px-3 py-2 mt-1"></div>'+
+      '</div>'+
+      '<button onclick="submitLeave()" class="mt-3 w-full md:w-auto bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-4 py-2.5 rounded text-sm">Ajukan</button>'+
+    '</div>'+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['ID','Tipe','Tanggal','Alasan','Status'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.submitLeave = ()=>{
+  const e = me();
+  const type = document.getElementById('lvType').value;
+  const start = document.getElementById('lvStart').value;
+  const end = document.getElementById('lvEnd').value;
+  const reason = document.getElementById('lvReason').value||'-';
+  if(!start||!end){ toast('Lengkapi tanggal','err'); return; }
+  const newId = 'LV'+String(state.leaveRequests.length+1).padStart(3,'0');
+  state.leaveRequests.push({
+    id:newId, empId:e.id, branchId:e.branchId,
+    type, startDate:start, endDate:end, reason,
+    status:'pending', approvedBy:null, createdAt:new Date().toISOString()
+  });
+  audit('Ajukan '+type+' '+newId+' oleh '+e.id); persist();
+  toast('Pengajuan dikirim — menunggu approval'); go('emp-leave');
+};
+
+VIEWS['emp-payslip'] = ()=>{
+  const e = me();
+  const myRuns = state.payrollRuns.filter(r=>r.status==='published' && r.rows.some(x=>x.empId===e.id));
+  const rows = myRuns.map(r=>{
+    const row = r.rows.find(x=>x.empId===e.id);
+    return '<tr class="border-b"><td class="py-2 px-3">'+r.period+'</td>'+
+      '<td class="py-2 px-3 text-right">'+fmt(row.gross)+'</td>'+
+      '<td class="py-2 px-3 text-right text-red-600">-'+fmt(row.deductions)+'</td>'+
+      '<td class="py-2 px-3 text-right font-semibold">'+fmt(row.net)+'</td>'+
+      '<td class="py-2 px-3"><button onclick="viewMyPayslip(\''+r.id+'\')" class="inline-btn text-xs bg-teal-600 text-white px-3 py-1.5 rounded whitespace-nowrap">Lihat</button></td></tr>';
+  }).join('') || '<tr><td colspan="5" class="py-4 text-center text-slate-400 text-sm">Belum ada slip.</td></tr>';
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Slip Gaji Saya</h2>'+
+    '<p class="text-xs md:text-sm text-slate-500 mb-3">Terbit setelah finance publish.</p>'+
+    scrollHint()+
+    '<div class="bg-white rounded-lg shadow-sm overflow-x-auto"><table class="w-full text-sm">'+
+    tableHead(['Periode','Gross','Potongan','Net','Aksi'])+'<tbody>'+rows+'</tbody></table></div>';
+};
+window.viewMyPayslip = prId=>{
+  const pr = state.payrollRuns.find(r=>r.id===prId); if(!pr) return;
+  const e = me();
+  const row = pr.rows.find(x=>x.empId===e.id); if(!row) return;
+  openModal(renderPayslip(pr,row,false));
+};
+
+VIEWS['emp-profile'] = ()=>{
+  const e = me();
+  return '<h2 class="text-lg md:text-xl font-bold mb-3">Profil Saya</h2>'+
+    '<div class="bg-white rounded-lg shadow-sm p-3 md:p-6 max-w-xl mb-4">'+
+      '<div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 md:gap-3 text-sm">'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">ID:</span> <b>'+e.id+'</b></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">Nama:</span> <b>'+e.name+'</b></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">Jabatan:</span> <span>'+e.position+'</span></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">Cabang:</span> <span>'+branchName(e.branchId)+'</span></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">Gaji Pokok:</span> <span>'+fmt(e.base)+'</span></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">Tunjangan:</span> <span>'+fmt(e.allowance)+'</span></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">Bank:</span> <span>'+e.bankName+'</span></div>'+
+        '<div class="flex justify-between md:block border-b md:border-0 pb-2 md:pb-0"><span class="text-slate-500">No Rek:</span> <span class="font-mono text-xs">'+e.bankAccount+'</span></div>'+
+        '<div class="flex justify-between md:block"><span class="text-slate-500">Masuk:</span> <span>'+fmtDate(e.joinedAt)+'</span></div>'+
+        '<div class="flex justify-between md:block"><span class="text-slate-500">Status:</span> <span>'+badge(e.status)+'</span></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="bg-teal-50 rounded-lg p-3 md:p-4 max-w-xl">'+
+      '<p class="text-xs font-semibold text-teal-800 mb-1">📋 Jobdesc Saya</p>'+
+      '<p class="text-sm text-slate-700 leading-relaxed">'+e.jobdesc+'</p>'+
+    '</div>';
+};
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+state = loadState();
+if(state.currentUser){ showApp(); }
+
+document.getElementById('inPass').addEventListener('keydown', e=>{
+  if(e.key==='Enter') doLogin();
+});
+</script>
+</body>
+</html>
