@@ -9,7 +9,7 @@
 </head>
 <body class="bg-white text-slate-800">
 
-  <!-- ========== LOGIN ========== -->
+  <!-- LOGIN -->
   <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-white via-purple-50 to-yellow-50">
     <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md border border-purple-100">
       <div class="text-center mb-6">
@@ -20,13 +20,11 @@
       <div class="space-y-3">
         <div>
           <label class="text-xs text-slate-600 font-medium">Username</label>
-          <input id="inUser" type="text" autocomplete="username" value="superadmin"
-                 class="w-full border border-purple-200 rounded-lg px-3 py-2.5 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+          <input id="inUser" type="text" autocomplete="username" value="superadmin" class="w-full border border-purple-200 rounded-lg px-3 py-2.5 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
         </div>
         <div>
           <label class="text-xs text-slate-600 font-medium">Password</label>
-          <input id="inPass" type="password" autocomplete="current-password" value="admin123"
-                 class="w-full border border-purple-200 rounded-lg px-3 py-2.5 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+          <input id="inPass" type="password" autocomplete="current-password" value="admin123" class="w-full border border-purple-200 rounded-lg px-3 py-2.5 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
         </div>
         <button onclick="doLogin()" class="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white py-3 rounded-lg font-medium text-base shadow-md">Masuk</button>
         <p id="loginErr" class="text-red-600 text-xs text-center hidden"></p>
@@ -46,7 +44,7 @@
     </div>
   </div>
 
-  <!-- ========== APP ========== -->
+  <!-- APP -->
   <div id="app-screen" class="hidden min-h-screen flex flex-col bg-white">
     <header class="bg-purple-700 text-white px-3 md:px-6 py-3 flex items-center justify-between no-print sticky top-0 z-30 shadow-md">
       <div class="flex items-center gap-2 md:gap-3 min-w-0">
@@ -75,7 +73,7 @@
     </div>
   </div>
 
-  <!-- ========== MODAL ========== -->
+  <!-- MODAL -->
   <div id="modal" class="hidden fixed inset-0 bg-purple-900/60 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
     <div id="modalContent" class="bg-white rounded-t-2xl md:rounded-xl shadow-xl max-w-3xl w-full p-4 md:p-6 max-h-[94vh] overflow-y-auto"></div>
   </div>

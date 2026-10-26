@@ -1,13 +1,33 @@
 /* ============================================================
-   Klinik Satwagia HRIS v3 — Main Application
+   Klinik Satwagia HRIS v4 — FINAL COMPLEX
+   Fitur:
+   - 66 karyawan, 10 cabang
+   - 6 shift kerja (cross-midnight handling)
+   - Auto-attendance (lupa clock-in/out > 2 jam dari jadwal)
+   - Selfie JPG 480x480 tanpa mirroring
+   - GPS otomatis
+   - RBAC 5 role
    ============================================================ */
+
+const STORAGE_KEY = 'satwagia_hris_v4';
+const TOTAL_EMPLOYEES = 66;
+const AUTO_ATTENDANCE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 jam
 
 /* ============================================================
-   SEED DATA — 66 KARYAWAN + JOBDESC
+   SHIFT KERJA (6 TIPE)
    ============================================================ */
-const STORAGE_KEY = 'satwagia_hris_v3';
-const TOTAL_EMPLOYEES = 66;
+const SHIFTS = [
+  { id: 'S1', name: 'Pagi',         start: '08:00', end: '17:00', category: 'pagi',  label: '08.00 – 17.00' },
+  { id: 'S2', name: 'Pagi Panjang', start: '08:00', end: '21:00', category: 'pagi',  label: '08.00 – 21.00' },
+  { id: 'S3', name: 'Siang',        start: '12:00', end: '21:00', category: 'siang', label: '12.00 – 21.00' },
+  { id: 'S4', name: 'Sore',         start: '16:00', end: '00:00', category: 'sore',  label: '16.00 – 00.00' },
+  { id: 'S5', name: 'Malam',        start: '23:00', end: '08:00', category: 'malam', label: '23.00 – 08.00' },
+  { id: 'S6', name: 'Malam Panjang',start: '20:00', end: '09:00', category: 'malam', label: '20.00 – 09.00' },
+];
 
+/* ============================================================
+   SEED DATA
+   ============================================================ */
 const POSITIONS = [
   { name: 'Dokter Hewan',  base: 9000000 },
   { name: 'Perawat Hewan', base: 4500000 },
@@ -29,6 +49,47 @@ const LASTNAMES  = ['Santoso','Nurhaliza','Setiawan','Lestari','Pratama','Aulia'
 
 let state = null;
 
+/* ============================================================
+   UTIL: tanggal & waktu lokal
+   ============================================================ */
+function localDateStr(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function parseHHMM(str) {
+  const [h, m] = str.split(':').map(Number);
+  return { h, m };
+}
+function formatHHMM(date) {
+  return String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+}
+
+/* ============================================================
+   SHIFT HELPERS
+   ============================================================ */
+function getShiftById(id) {
+  return SHIFTS.find(s => s.id === id) || SHIFTS[0];
+}
+function getShiftStart(shift, dateStr) {
+  const { h, m } = parseHHMM(shift.start);
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+function getShiftEnd(shift, dateStr) {
+  const { h, m } = parseHHMM(shift.end);
+  const startH = parseHHMM(shift.start).h;
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setHours(h, m, 0, 0);
+  // Shift lintas hari (end < start) → +1 hari
+  if (h < startH || (h === 0 && startH >= 16)) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+/* ============================================================
+   SEED
+   ============================================================ */
 function seedData() {
   const branches = Array.from({ length: 10 }, (_, i) => ({
     id: i + 1,
@@ -41,6 +102,7 @@ function seedData() {
   for (let i = 0; i < TOTAL_EMPLOYEES; i++) {
     const pos = POSITIONS[i % POSITIONS.length];
     const br  = branches[i % 10];
+    const shift = SHIFTS[i % SHIFTS.length];
     employees.push({
       id: 'EMP' + String(i + 1).padStart(3, '0'),
       name: FIRSTNAMES[i % FIRSTNAMES.length] + ' ' + LASTNAMES[i % LASTNAMES.length],
@@ -53,15 +115,16 @@ function seedData() {
       bankAccount: String(1000000000 + i),
       joinedAt: '2024-' + String((i % 9) + 1).padStart(2, '0') + '-15',
       status: 'active',
+      shiftId: shift.id,
     });
   }
 
   const users = [
-    { username: 'superadmin', password: 'admin123',   name: 'Super Admin',      role: 'superadmin' },
-    { username: 'hrd',        password: 'hrd123',     name: 'Sarah HRD',        role: 'hrd' },
-    { username: 'finance',    password: 'finance123', name: 'Budi Finance',     role: 'finance' },
-    { username: 'mgr1',       password: 'mgr123',     name: 'Andi (Cabang 1)',  role: 'manager', branchId: 1 },
-    { username: 'mgr2',       password: 'mgr123',     name: 'Rina (Cabang 2)',  role: 'manager', branchId: 2 },
+    { username: 'superadmin', password: 'admin123',   name: 'Super Admin',     role: 'superadmin' },
+    { username: 'hrd',        password: 'hrd123',     name: 'Sarah HRD',       role: 'hrd' },
+    { username: 'finance',    password: 'finance123', name: 'Budi Finance',    role: 'finance' },
+    { username: 'mgr1',       password: 'mgr123',     name: 'Andi (Cabang 1)', role: 'manager', branchId: 1 },
+    { username: 'mgr2',       password: 'mgr123',     name: 'Rina (Cabang 2)', role: 'manager', branchId: 2 },
   ];
   employees.forEach(e => users.push({
     username: e.id.toLowerCase(),
@@ -71,17 +134,20 @@ function seedData() {
     employeeId: e.id,
   }));
 
-  // Absensi 30 hari terakhir (weekday only)
+  // Absensi 30 hari terakhir — supaya ada history
   const attendances = [];
   const today = new Date();
   for (let d = 1; d <= 30; d++) {
     const date = new Date(today);
     date.setDate(date.getDate() - d);
     if (date.getDay() === 0 || date.getDay() === 6) continue;
-    const ds = date.toISOString().slice(0, 10);
+    const ds = localDateStr(date);
     employees.forEach((e, idx) => {
       const r = (idx + d * 3) % 12;
-      let status = 'hadir', inTime = '08:00', outTime = '17:00', late = 0;
+      let status = 'hadir';
+      let inTime = '08:00';
+      let outTime = '17:00';
+      let late = 0;
       if (r === 0) { status = 'izin';  inTime = '-'; outTime = '-'; }
       else if (r === 1) { status = 'sakit'; inTime = '-'; outTime = '-'; }
       else if (r === 2) { inTime = '08:15'; late = 15; }
@@ -92,8 +158,10 @@ function seedData() {
         empId: e.id, date: ds, inTime, outTime,
         lateMinutes: late, status,
         source: 'workting',
+        shiftId: e.shiftId,
         selfieData: null, gpsIn: null,
         outSelfieData: null, gpsOut: null, outAt: null,
+        autoIn: false, autoOut: false,
       });
     });
   }
@@ -105,7 +173,7 @@ function seedData() {
     overtimeRequests.push({
       id: 'OT' + String(i + 1).padStart(3, '0'),
       empId: e.id, branchId: e.branchId,
-      date: d.toISOString().slice(0, 10),
+      date: localDateStr(d),
       hours: [1, 2, 3, 2, 1.5, 4][i % 6],
       reason: ['Closing bulanan','Extra shift','Emergency','Stock opname','Kunjungan luar'][i % 5],
       status: ['approved','approved','pending','pending','rejected'][i % 5],
@@ -122,8 +190,8 @@ function seedData() {
       id: 'LV' + String(i + 1).padStart(3, '0'),
       empId: e.id, branchId: e.branchId,
       type: ['cuti','izin','sakit'][i % 3],
-      startDate: d.toISOString().slice(0, 10),
-      endDate: d.toISOString().slice(0, 10),
+      startDate: localDateStr(d),
+      endDate: localDateStr(d),
       reason: ['Keperluan keluarga','Sakit demam','Urusan pribadi'][i % 3],
       status: i % 3 === 0 ? 'approved' : 'pending',
       approvedBy: i % 3 === 0 ? 'Sarah HRD' : null,
@@ -134,12 +202,12 @@ function seedData() {
   const st = {
     branches, employees, users, attendances,
     overtimeRequests, leaveRequests,
-    payrollRuns: [], auditLog: [], currentUser: null, version: 3,
+    payrollRuns: [], auditLog: [], currentUser: null, version: 4,
   };
 
   const prev = new Date();
   prev.setMonth(prev.getMonth() - 1);
-  const period = prev.toISOString().slice(0, 7);
+  const period = localDateStr(prev).slice(0, 7);
   const rows = computeRowsForPeriod(st, period);
   st.payrollRuns.push({
     id: 'PR-' + period, period, rows, status: 'published',
@@ -148,7 +216,7 @@ function seedData() {
     finalizedAt: prev.toISOString(),
     publishedAt: prev.toISOString(),
   });
-  st.auditLog.push({ ts: prev.toISOString(), user: 'system', action: 'Seed 66 karyawan + payroll ' + period });
+  st.auditLog.push({ ts: prev.toISOString(), user: 'system', action: 'Seed 66 karyawan + 6 shift + payroll ' + period });
   return st;
 }
 
@@ -168,10 +236,12 @@ function computeRowsForPeriod(st, period) {
     const gross = e.base + e.allowance + overtimePay;
     const deductions = lateDeduction + absenceDeduction + bpjs + pph21;
     const net = gross - deductions;
+    const shift = getShiftById(e.shiftId);
     return {
       empId: e.id, name: e.name, branchId: e.branchId, position: e.position,
       bankName: e.bankName, bankAccount: e.bankAccount,
       base: e.base, allowance: e.allowance,
+      shiftId: e.shiftId, shiftLabel: shift.label,
       otHours, overtimePay,
       lateMinutes: lateMin, lateDeduction,
       hadir, alpha, absenceDeduction, bpjs, pph21,
@@ -181,14 +251,14 @@ function computeRowsForPeriod(st, period) {
 }
 
 /* ============================================================
-   PERSISTENCE — dengan fallback quota exceeded
+   PERSISTENCE
    ============================================================ */
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     try {
       const s = JSON.parse(raw);
-      if (s.version === 3) return s;
+      if (s.version === 4) return s;
     } catch (e) {}
   }
   const s = seedData();
@@ -206,15 +276,12 @@ function persist() {
         .sort((a, b) => a.date.localeCompare(b.date));
       let pruned = 0;
       for (const rec of withSelfie) {
-        if (pruned >= 30) break;
+        if (pruned >= 40) break;
         if (rec.selfieData) { delete rec.selfieData; pruned++; }
         if (rec.outSelfieData) { delete rec.outSelfieData; pruned++; }
       }
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch (e2) {
-        alert('Storage browser penuh. Reset data lewat Super Admin → Audit Log → Reset.');
-      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+      catch (e2) { alert('Storage browser penuh. Reset data via Super Admin → Audit Log.'); }
     } else {
       console.error(err);
     }
@@ -246,6 +313,15 @@ function badge(s) {
   return '<span class="px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ' + (m[s] || 'bg-slate-100') + '">' + s + '</span>';
 }
 
+function autoBadge(flag, title) {
+  return flag ? '<span class="badge-auto" title="' + (title || 'Diisi otomatis oleh sistem') + '">AUTO</span>' : '';
+}
+
+function shiftBadge(shiftId) {
+  const s = getShiftById(shiftId);
+  return '<span class="shift-badge shift-' + s.category + '">' + s.label + '</span>';
+}
+
 function audit(action) {
   state.auditLog.unshift({
     ts: new Date().toISOString(),
@@ -273,11 +349,122 @@ function toast(msg, type) {
   d.className = 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm ' + c + ' text-white px-4 py-3 rounded-lg shadow-lg text-sm z-[60] text-center md:text-left';
   d.textContent = msg;
   document.body.appendChild(d);
-  setTimeout(() => d.remove(), 2500);
+  setTimeout(() => d.remove(), 3000);
 }
 
 /* ============================================================
-   KAMERA & GPS — UNTUK ABSENSI
+   AUTO-ATTENDANCE ENGINE
+   - Jika lupa clock-in > 2 jam dari jadwal shift → auto clock-in di jam mulai shift
+   - Jika lupa clock-out > 2 jam dari akhir shift → auto clock-out di jam selesai shift
+   - Handle shift lintas hari (23:00-08:00 dst)
+   ============================================================ */
+function runAutoAttendance() {
+  const now = new Date();
+  const today = new Date(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const todayStr = localDateStr(today);
+  const yesterdayStr = localDateStr(yesterday);
+
+  let createdIn = 0, createdOut = 0, updatedIn = 0, updatedOut = 0;
+
+  state.employees.forEach(emp => {
+    const shift = getShiftById(emp.shiftId || 'S1');
+
+    [todayStr, yesterdayStr].forEach(dateStr => {
+      const start = getShiftStart(shift, dateStr);
+      const end = getShiftEnd(shift, dateStr);
+
+      // Skip shift yang belum dimulai
+      if (start.getTime() > now.getTime()) return;
+
+      // === AUTO CLOCK-IN ===
+      const attForIn = state.attendances.find(a => a.empId === emp.id && a.date === dateStr);
+      const needIn = now.getTime() > start.getTime() + AUTO_ATTENDANCE_THRESHOLD_MS
+                   && (!attForIn || !attForIn.inTime || attForIn.inTime === '-');
+
+      if (needIn) {
+        if (attForIn) {
+          attForIn.inTime = formatHHMM(start);
+          attForIn.status = 'hadir';
+          attForIn.autoIn = true;
+          attForIn.autoNote = 'Auto clock-in: lupa absen masuk >2 jam dari jadwal';
+          updatedIn++;
+        } else {
+          state.attendances.push({
+            id: 'ATT_AUTO_IN_' + dateStr.replace(/-/g, '') + emp.id,
+            empId: emp.id, date: dateStr,
+            inTime: formatHHMM(start), outTime: '-',
+            lateMinutes: 0, status: 'hadir',
+            source: 'auto',
+            shiftId: emp.shiftId,
+            selfieData: null, gpsIn: { lat: 'AUTO', lng: 'AUTO' },
+            outSelfieData: null, gpsOut: null, outAt: null,
+            autoIn: true, autoOut: false,
+            autoNote: 'Auto clock-in: lupa absen masuk >2 jam dari jadwal',
+          });
+          createdIn++;
+        }
+      }
+
+      // === AUTO CLOCK-OUT ===
+      const attForOut = state.attendances.find(a => a.empId === emp.id && a.date === dateStr);
+      const needOut = now.getTime() > end.getTime() + AUTO_ATTENDANCE_THRESHOLD_MS
+                    && attForOut
+                    && attForOut.inTime && attForOut.inTime !== '-'
+                    && (!attForOut.outTime || attForOut.outTime === '-');
+
+      if (needOut) {
+        attForOut.outTime = formatHHMM(end);
+        attForOut.autoOut = true;
+        attForOut.outAt = end.toISOString();
+        attForOut.autoNote = (attForOut.autoNote ? attForOut.autoNote + '; ' : '')
+                           + 'Auto clock-out: lupa absen keluar >2 jam dari jadwal';
+        updatedOut++;
+      }
+    });
+  });
+
+  const totalCreated = createdIn + createdOut;
+  const totalUpdated = updatedIn + updatedOut;
+
+  if (totalCreated + totalUpdated > 0) {
+    audit('Auto-attendance: ' + totalCreated + ' dibuat, ' + totalUpdated + ' diperbarui');
+    persist();
+  }
+
+  return { createdIn, createdOut, updatedIn, updatedOut, total: totalCreated + totalUpdated };
+}
+
+/* ============================================================
+   FIND PENDING ATTENDANCE (untuk clock-out lintas hari)
+   ============================================================ */
+function findPendingAttendance(empId) {
+  const now = new Date();
+  const todayStr = localDateStr(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = localDateStr(yesterday);
+
+  // Prioritas: hari ini dulu
+  let att = state.attendances.find(a =>
+    a.empId === empId && a.date === todayStr &&
+    a.inTime && a.inTime !== '-' &&
+    (!a.outTime || a.outTime === '-')
+  );
+  if (att) return att;
+
+  // Fallback: kemarin (untuk shift lintas hari)
+  return state.attendances.find(a =>
+    a.empId === empId && a.date === yesterdayStr &&
+    a.inTime && a.inTime !== '-' &&
+    (!a.outTime || a.outTime === '-')
+  );
+}
+
+/* ============================================================
+   KAMERA & GPS — JPG 480x480, TANPA MIRROR
    ============================================================ */
 let _camStream = null;
 let _capturedPhoto = null;
@@ -287,11 +474,11 @@ let _clockType = null;
 async function startCameraInto(videoEl) {
   try {
     _camStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
       audio: false,
     });
     videoEl.srcObject = _camStream;
-    videoEl.classList.add('mirror');
+    // TANPA mirroring — sesuai permintaan
     return true;
   } catch (e) {
     return false;
@@ -315,18 +502,31 @@ async function startClockCapture(type) {
     ? 'bg-purple-600 hover:bg-purple-700'
     : 'bg-yellow-400 hover:bg-yellow-500 text-purple-900';
 
+  const emp = me();
+  const shift = getShiftById(emp.shiftId);
+  const now = new Date();
+  const todayStr = localDateStr(now);
+  const shiftStart = getShiftStart(shift, todayStr);
+  const shiftEnd = getShiftEnd(shift, todayStr);
+
+  // Info shift untuk display
+  const shiftInfo = '<div class="bg-purple-50 border border-purple-200 rounded-lg p-2 mb-3 text-xs">' +
+    '<p class="text-purple-800"><b>Shift Anda:</b> ' + shift.name + ' (' + shift.label + ')</p>' +
+    '</div>';
+
   openModal(
     '<div class="flex items-start justify-between mb-3">' +
       '<div><h3 class="font-bold text-base md:text-lg">📸 ' + title + '</h3>' +
       '<p class="text-xs text-slate-500">Ambil selfie + GPS otomatis</p></div>' +
       '<button onclick="closeModal()" class="p-1 rounded hover:bg-slate-100"><svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>' +
     '</div>' +
+    shiftInfo +
     '<div class="camera-wrap mb-3">' +
       '<video id="camPreview" autoplay playsinline muted></video>' +
       '<img id="photoPreview" class="hidden" alt="selfie">' +
       '<div id="camError" class="hidden absolute inset-0 flex items-center justify-center text-white text-center p-4 text-xs"></div>' +
     '</div>' +
-    '<div id="gpsBox" class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3 text-sm">' +
+    '<div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3 text-sm">' +
       '<div class="flex items-start gap-2"><span class="text-lg">📍</span>' +
       '<div class="flex-1"><p class="text-xs text-slate-500 font-medium">Lokasi GPS</p>' +
       '<p id="gpsText" class="text-sm text-purple-800">Mengambil lokasi...</p></div></div>' +
@@ -345,7 +545,7 @@ async function startClockCapture(type) {
   const ok = await startCameraInto(vid);
   if (!ok) {
     const errDiv = document.getElementById('camError');
-    errDiv.innerHTML = '📵<br>Kamera tidak dapat diakses.<br><span class="text-[10px] opacity-75">Buka via HTTPS (Netlify) atau izinkan kamera. Anda tetap bisa absen dengan placeholder.</span>';
+    errDiv.innerHTML = '📵<br>Kamera tidak dapat diakses.<br><span class="text-[10px] opacity-75">Buka via HTTPS atau izinkan kamera. Absensi tetap bisa dilakukan dengan placeholder.</span>';
     errDiv.classList.remove('hidden');
   }
 
@@ -372,31 +572,35 @@ async function startClockCapture(type) {
 function captureSelfie() {
   const video = document.getElementById('camPreview');
   const canvas = document.createElement('canvas');
-  canvas.width = 200;
-  canvas.height = 200;
+  canvas.width = 480;
+  canvas.height = 480;
   const ctx = canvas.getContext('2d');
-  const vw = video.videoWidth || 640;
-  const vh = video.videoHeight || 480;
+  const vw = video.videoWidth || 720;
+  const vh = video.videoHeight || 720;
   const size = Math.min(vw, vh);
   const sx = (vw - size) / 2;
   const sy = (vh - size) / 2;
 
   if (!video.srcObject || !vw) {
+    // Placeholder kalau kamera tidak tersedia
     ctx.fillStyle = '#7c3aed';
-    ctx.fillRect(0, 0, 200, 200);
+    ctx.fillRect(0, 0, 480, 480);
     ctx.fillStyle = '#fbbf24';
-    ctx.font = 'bold 22px sans-serif';
+    ctx.font = 'bold 48px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('📷', 100, 90);
+    ctx.fillText('📷', 240, 220);
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('NO CAMERA', 100, 120);
-    ctx.font = '11px sans-serif';
-    ctx.fillText(new Date().toLocaleString('id-ID'), 100, 140);
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText('NO CAMERA', 240, 280);
+    ctx.font = '20px sans-serif';
+    ctx.fillText(new Date().toLocaleString('id-ID'), 240, 320);
   } else {
-    ctx.drawImage(video, sx, sy, size, size, 0, 0, 200, 200);
+    // Gambar asli tanpa mirroring
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, 480, 480);
   }
-  _capturedPhoto = canvas.toDataURL('image/jpeg', 0.6);
+
+  // JPG quality 0.85 untuk hasil jernih
+  _capturedPhoto = canvas.toDataURL('image/jpeg', 0.85);
 
   const img = document.getElementById('photoPreview');
   img.src = _capturedPhoto;
@@ -422,33 +626,57 @@ function confirmClockAction() {
   if (!_capturedPhoto) { toast('Ambil foto dulu', 'err'); return; }
   if (!_currentGps) { toast('Tunggu GPS selesai...', 'warn'); return; }
 
-  const e = me();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const emp = me();
   const now = new Date();
-  const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const todayStr = localDateStr(now);
+  const hhmm = formatHHMM(now);
+  const shift = getShiftById(emp.shiftId);
+  const shiftStart = getShiftStart(shift, todayStr);
 
   if (_clockType === 'in') {
-    if (state.attendances.find(a => a.empId === e.id && a.date === todayStr)) {
+    // Cek existing today
+    if (state.attendances.find(a => a.empId === emp.id && a.date === todayStr && a.inTime && a.inTime !== '-')) {
       toast('Sudah clock in hari ini', 'warn');
       closeModal();
       return;
     }
-    const late = Math.max(0, (now.getHours() * 60 + now.getMinutes()) - 480);
-    state.attendances.push({
-      id: 'ATT' + todayStr.replace(/-/g, '') + e.id + '-' + Date.now(),
-      empId: e.id, date: todayStr,
-      inTime: hhmm, outTime: '-',
-      lateMinutes: late, status: 'hadir',
-      source: 'self-clockin',
-      selfieData: _capturedPhoto, gpsIn: _currentGps,
-      outSelfieData: null, gpsOut: null, outAt: null,
-    });
-    audit('Clock IN ' + e.id + ' @' + hhmm);
+    // Hitung late minutes dari shift start
+    const late = Math.max(0, Math.floor((now.getTime() - shiftStart.getTime()) / 60000));
+
+    // Cari record yang mungkin sudah dibuat auto (kalau ada)
+    let att = state.attendances.find(a => a.empId === emp.id && a.date === todayStr);
+
+    if (att) {
+      // Overwrite auto record dengan foto & GPS asli
+      att.inTime = hhmm;
+      att.selfieData = _capturedPhoto;
+      att.gpsIn = _currentGps;
+      att.lateMinutes = late;
+      att.status = 'hadir';
+      att.source = 'self-clockin';
+      att.shiftId = emp.shiftId;
+      att.autoIn = false;
+      att.autoNote = (att.autoNote ? att.autoNote + '; Diperbaiki manual' : null);
+    } else {
+      state.attendances.push({
+        id: 'ATT' + todayStr.replace(/-/g, '') + emp.id + '-' + Date.now(),
+        empId: emp.id, date: todayStr,
+        inTime: hhmm, outTime: '-',
+        lateMinutes: late, status: 'hadir',
+        source: 'self-clockin',
+        shiftId: emp.shiftId,
+        selfieData: _capturedPhoto, gpsIn: _currentGps,
+        outSelfieData: null, gpsOut: null, outAt: null,
+        autoIn: false, autoOut: false,
+      });
+    }
+    audit('Clock IN ' + emp.id + ' @' + hhmm);
     toast('✓ Clock In ' + hhmm + ' tersimpan');
   } else {
-    const att = state.attendances.find(a => a.empId === e.id && a.date === todayStr && (!a.outTime || a.outTime === '-'));
+    // Clock out — cari pending (bisa hari ini atau kemarin untuk shift lintas hari)
+    const att = findPendingAttendance(emp.id);
     if (!att) {
-      toast('Belum clock in / sudah clock out', 'err');
+      toast('Belum clock in atau sudah clock out', 'err');
       closeModal();
       return;
     }
@@ -456,9 +684,11 @@ function confirmClockAction() {
     att.outSelfieData = _capturedPhoto;
     att.gpsOut = _currentGps;
     att.outAt = now.toISOString();
-    audit('Clock OUT ' + e.id + ' @' + hhmm);
+    att.autoOut = false;
+    audit('Clock OUT ' + emp.id + ' @' + hhmm);
     toast('✓ Clock Out ' + hhmm + ' tersimpan');
   }
+
   persist();
   closeModal();
   go('emp-clock');
@@ -470,27 +700,32 @@ window.showAttendancePhoto = (recId, type) => {
   const photo = type === 'out' ? rec.outSelfieData : rec.selfieData;
   const gps = type === 'out' ? rec.gpsOut : rec.gpsIn;
   const time = type === 'out' ? rec.outTime : rec.inTime;
+  const isAuto = type === 'out' ? rec.autoOut : rec.autoIn;
   const e = empById(rec.empId);
+  const shift = getShiftById(rec.shiftId || (e ? e.shiftId : 'S1'));
+
   openModal(
     '<div class="flex justify-between items-start mb-3">' +
       '<div><h3 class="font-bold text-base md:text-lg">📸 Foto ' + type.toUpperCase() + '</h3>' +
-      '<p class="text-xs text-slate-500">' + (e ? e.name : '') + ' · ' + rec.date + ' · ' + time + '</p></div>' +
+      '<p class="text-xs text-slate-500">' + (e ? e.name : '') + ' · ' + rec.date + ' · ' + time + (isAuto ? ' (AUTO)' : '') + '</p>' +
+      '<p class="text-xs text-slate-500 mt-0.5">Shift: ' + shift.name + ' (' + shift.label + ')</p></div>' +
       '<button onclick="closeModal()" class="p-1 rounded hover:bg-slate-100"><svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>' +
     '</div>' +
     (photo
       ? '<img src="' + photo + '" class="w-full max-w-xs mx-auto rounded-xl border-2 border-purple-200 mb-3 shadow">'
-      : '<div class="text-center text-slate-400 py-8 bg-slate-50 rounded-xl mb-3 text-sm">📵 Tidak ada foto tersimpan</div>') +
+      : '<div class="text-center text-slate-400 py-8 bg-slate-50 rounded-xl mb-3 text-sm">' + (isAuto ? '⚠ Diisi otomatis oleh sistem (tidak ada foto)' : '📵 Tidak ada foto tersimpan') + '</div>') +
+    (isAuto && rec.autoNote ? '<div class="warn-banner mb-3"><b>Catatan sistem:</b> ' + rec.autoNote + '</div>' : '') +
     '<div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3 text-sm">' +
       '<p class="text-xs text-slate-500 font-medium mb-1">📍 GPS saat absen</p>' +
       '<p class="text-purple-800 font-mono text-xs">' + (gps ? gps.lat + ', ' + gps.lng : 'Tidak tersedia') + '</p>' +
-      (gps && gps.lat !== 'N/A' ? '<a href="https://www.google.com/maps?q=' + gps.lat + ',' + gps.lng + '" target="_blank" class="text-xs text-purple-600 underline mt-1 inline-block">Buka di Google Maps →</a>' : '') +
+      (gps && gps.lat !== 'N/A' && gps.lat !== 'AUTO' ? '<a href="https://www.google.com/maps?q=' + gps.lat + ',' + gps.lng + '" target="_blank" class="text-xs text-purple-600 underline mt-1 inline-block">Buka di Google Maps →</a>' : '') +
     '</div>' +
     '<button onclick="closeModal()" class="w-full bg-slate-200 py-2.5 rounded-lg">Tutup</button>'
   );
 };
 
 /* ============================================================
-   SIDEBAR DRAWER
+   SIDEBAR
    ============================================================ */
 function toggleSidebar() {
   const sb = document.getElementById('sidebar');
@@ -503,7 +738,6 @@ function toggleSidebar() {
     document.body.classList.add('overflow-hidden');
   }
 }
-
 function closeSidebarDrawer() {
   document.getElementById('sidebar').classList.add('-translate-x-full');
   document.getElementById('sidebar-backdrop').classList.add('hidden');
@@ -538,6 +772,16 @@ function doLogin() {
   audit('Login sebagai ' + usr.role);
   persist();
   showApp();
+
+  // Auto-attendance: jalankan saat admin/manager login
+  if (usr.role !== 'employee') {
+    setTimeout(() => {
+      const r = runAutoAttendance();
+      if (r.total > 0) {
+        toast('🤖 Auto-attendance: ' + r.createdIn + ' clock-in, ' + r.createdOut + ' clock-out, ' + r.updatedIn + '+' + r.updatedOut + ' diperbarui');
+      }
+    }, 800);
+  }
 }
 
 function doLogout() {
@@ -557,16 +801,17 @@ const MENUS = {
     { k: 'sa-dash',     l: 'Dashboard Sistem', i: '📊' },
     { k: 'sa-users',    l: 'Kelola User',      i: '👤' },
     { k: 'sa-branches', l: 'Kelola Cabang',    i: '🏥' },
+    { k: 'sa-shifts',   l: 'Kelola Shift',     i: '⏰' },
     { k: 'sa-master',   l: 'Master Data',      i: '⚙️' },
     { k: 'sa-audit',    l: 'Audit Log',        i: '📜' },
   ],
   hrd: [
-    { k: 'hrd-dash',   l: 'Dashboard HR',         i: '📊' },
-    { k: 'hrd-emp',    l: 'Data Karyawan',        i: '👥' },
-    { k: 'hrd-att',    l: 'Monitoring Absensi',   i: '⏰' },
-    { k: 'hrd-ot',     l: 'Approval Lembur',      i: '🕒' },
-    { k: 'hrd-leave',  l: 'Approval Cuti/Izin',   i: '📝' },
-    { k: 'hrd-report', l: 'Laporan HR',           i: '📈' },
+    { k: 'hrd-dash',   l: 'Dashboard HR',       i: '📊' },
+    { k: 'hrd-emp',    l: 'Data Karyawan',      i: '👥' },
+    { k: 'hrd-att',    l: 'Monitoring Absensi', i: '⏰' },
+    { k: 'hrd-ot',     l: 'Approval Lembur',    i: '🕒' },
+    { k: 'hrd-leave',  l: 'Approval Cuti/Izin', i: '📝' },
+    { k: 'hrd-report', l: 'Laporan HR',         i: '📈' },
   ],
   finance: [
     { k: 'fin-dash',    l: 'Dashboard Finance', i: '📊' },
@@ -616,8 +861,7 @@ function renderSidebar() {
       '<button data-menu="' + m.k + '" class="menu-item w-full text-left px-3 py-2.5 md:py-2 rounded-lg text-sm mb-1 hover:bg-purple-50 active:bg-purple-100 ' + (activeMenu === m.k ? 'menu-active' : 'text-slate-700') + '">' +
       '<span class="mr-2">' + m.i + '</span>' + m.l + '</button>'
     ).join('') +
-    '<div class="mt-4 pt-4 border-t border-purple-100 text-xs text-slate-400 px-2">© Satwagia HRIS v3</div>';
-
+    '<div class="mt-4 pt-4 border-t border-purple-100 text-xs text-slate-400 px-2">© Satwagia HRIS v4</div>';
   document.querySelectorAll('.menu-item').forEach(b => b.onclick = () => {
     go(b.dataset.menu);
     if (window.innerWidth < 768) closeSidebarDrawer();
@@ -628,7 +872,6 @@ function renderSidebar() {
    ROUTER
    ============================================================ */
 const VIEWS = {};
-
 function go(key) {
   activeMenu = key;
   renderSidebar();
@@ -654,13 +897,16 @@ function scrollHint() {
   return '<p class="md:hidden text-[11px] text-slate-400 mb-1 flex items-center gap-1"><span>👉</span> Geser tabel · Tap foto untuk detail</p>';
 }
 
-function photoThumb(recId, type, data) {
+function photoThumb(recId, type, data, isAuto) {
+  if (isAuto && !data) {
+    return '<span class="inline-flex items-center justify-center w-9 h-9 rounded bg-yellow-100 border-2 border-yellow-300 text-[9px] font-bold text-yellow-800 cursor-pointer" onclick="event.stopPropagation();showAttendancePhoto(\'' + recId + '\',\'' + type + '\')">AUTO</span>';
+  }
   if (!data) return '<span class="text-slate-300 text-xs">—</span>';
   return '<img src="' + data + '" class="w-9 h-9 rounded object-cover border-2 border-purple-200 cursor-pointer" onclick="event.stopPropagation();showAttendancePhoto(\'' + recId + '\',\'' + type + '\')">';
 }
 
 /* ============================================================
-   SUPER ADMIN VIEWS
+   SUPER ADMIN
    ============================================================ */
 VIEWS['sa-dash'] = () => {
   const totalUsers = state.users.length;
@@ -669,6 +915,8 @@ VIEWS['sa-dash'] = () => {
                        state.leaveRequests.filter(l => l.status === 'pending').length;
   const totalPayroll = state.payrollRuns.filter(p => p.status === 'published')
     .reduce((s, p) => s + p.rows.reduce((a, r) => a + r.net, 0), 0);
+  const todayStr = localDateStr();
+  const todayAuto = state.attendances.filter(a => a.date === todayStr && (a.autoIn || a.autoOut)).length;
   return '<h2 class="text-lg md:text-xl font-bold mb-3 md:mb-4 text-purple-900">Dashboard Sistem</h2>' +
     '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">' +
       statCard('Total User', totalUsers, '👤', 'bg-purple-50') +
@@ -676,7 +924,10 @@ VIEWS['sa-dash'] = () => {
       statCard('Karyawan Klinik', totalEmp, '👥', 'bg-yellow-50') +
       statCard('Request Pending', totalPending, '⏳', 'bg-white') +
     '</div>' +
-    '<div class="mb-4 md:mb-6">' + statCard('Total Payroll Published (all-time)', fmt(totalPayroll), '💰', 'bg-gradient-to-br from-purple-50 to-yellow-50') + '</div>' +
+    '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">' +
+      statCard('Total Payroll Published', fmt(totalPayroll), '💰', 'bg-gradient-to-br from-purple-50 to-yellow-50') +
+      statCard('Auto-Attendance Hari Ini', todayAuto + ' record', '🤖', 'bg-yellow-50') +
+    '</div>' +
     '<div class="bg-white border border-purple-100 rounded-xl p-3 md:p-4 shadow-sm">' +
       '<h3 class="font-semibold mb-2 text-sm md:text-base text-purple-900">Ringkasan per Role</h3>' +
       '<div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">' +
@@ -685,7 +936,7 @@ VIEWS['sa-dash'] = () => {
           return '<div class="p-2 bg-purple-50 rounded-lg"><b class="text-xs md:text-sm text-purple-800">' + r + '</b><div class="text-slate-500 text-[11px]">' + c + ' user</div></div>';
         }).join('') +
       '</div>' +
-      '<p class="text-xs text-purple-600 mt-3">✓ 66 karyawan klinik (EMP001–EMP066) masing-masing punya akun login sendiri.</p>' +
+      '<p class="text-xs text-purple-600 mt-3">✓ 66 karyawan klinik (EMP001–EMP066) · 6 shift · auto-attendance aktif</p>' +
     '</div>';
 };
 
@@ -708,18 +959,20 @@ VIEWS['sa-users'] = () => {
 };
 
 window.showAllEmpCredentials = () => {
-  const rows = state.employees.map(e =>
-    '<tr class="border-b border-purple-50"><td class="py-1.5 px-2 font-mono text-xs text-purple-700">' + e.id.toLowerCase() + '</td>' +
+  const rows = state.employees.map(e => {
+    const shift = getShiftById(e.shiftId);
+    return '<tr class="border-b border-purple-50"><td class="py-1.5 px-2 font-mono text-xs text-purple-700">' + e.id.toLowerCase() + '</td>' +
     '<td class="py-1.5 px-2 text-xs">emp123</td><td class="py-1.5 px-2 text-xs">' + e.name + '</td>' +
-    '<td class="py-1.5 px-2 text-xs text-slate-500">' + e.position + ' · ' + branchName(e.branchId) + '</td></tr>'
-  ).join('');
+    '<td class="py-1.5 px-2 text-xs text-slate-500">' + e.position + ' · ' + branchName(e.branchId) + '</td>' +
+    '<td class="py-1.5 px-2 text-xs">' + shiftBadge(e.shiftId) + '</td></tr>';
+  }).join('');
   openModal(
     '<h3 class="font-bold text-base md:text-lg mb-1 text-purple-900">🔑 Akun 66 Karyawan</h3>' +
     '<p class="text-xs text-slate-500 mb-3">Password semua: <b class="font-mono bg-yellow-100 px-1 rounded">emp123</b></p>' +
     '<div class="max-h-[60vh] overflow-y-auto border border-purple-100 rounded"><table class="w-full text-sm">' +
     '<thead class="bg-purple-50 sticky top-0 text-xs uppercase text-purple-800"><tr>' +
-      '<th class="text-left py-2 px-2">Username</th><th class="text-left py-2 px-2">Pass</th>' +
-      '<th class="text-left py-2 px-2">Nama</th><th class="text-left py-2 px-2">Jabatan</th>' +
+      '<th class="text-left py-2 px-2">User</th><th class="text-left py-2 px-2">Pass</th>' +
+      '<th class="text-left py-2 px-2">Nama</th><th class="text-left py-2 px-2">Jabatan</th><th class="text-left py-2 px-2">Shift</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<button onclick="closeModal()" class="w-full bg-slate-200 py-2.5 rounded-lg mt-3">Tutup</button>'
   );
@@ -735,6 +988,25 @@ VIEWS['sa-branches'] = () => {
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Kelola Cabang (' + state.branches.length + ')</h2>' + scrollHint() +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto"><table class="w-full text-sm">' +
     tableHead(['ID','Nama','Alamat','Telp','Karyawan']) + '<tbody>' + rows + '</tbody></table></div>';
+};
+
+VIEWS['sa-shifts'] = () => {
+  const rows = SHIFTS.map(s => {
+    const cnt = state.employees.filter(e => e.shiftId === s.id).length;
+    return '<tr class="border-b border-purple-50"><td class="py-2 px-3 font-mono text-xs">' + s.id + '</td>' +
+      '<td class="py-2 px-3 font-medium">' + s.name + '</td>' +
+      '<td class="py-2 px-3 font-mono">' + s.start + '</td>' +
+      '<td class="py-2 px-3 font-mono">' + s.end + '</td>' +
+      '<td class="py-2 px-3">' + shiftBadge(s.id) + '</td>' +
+      '<td class="py-2 px-3 text-right font-semibold text-purple-700">' + cnt + '</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Kelola Shift Kerja (6 Tipe)</h2>' +
+    '<div class="warn-banner mb-3">' +
+      '<b>Info:</b> Auto-attendance aktif. Jika karyawan lupa clock-in/out <b>>2 jam</b> dari jadwal shift, sistem akan otomatis mengisi jam absensi sesuai jadwal. Shift lintas hari (23:00–08:00, 20:00–09:00) ditangani otomatis.' +
+    '</div>' +
+    scrollHint() +
+    '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto"><table class="w-full text-sm">' +
+    tableHead(['ID','Nama Shift','Mulai','Selesai','Label','Karyawan']) + '<tbody>' + rows + '</tbody></table></div>';
 };
 
 VIEWS['sa-master'] = () => {
@@ -774,17 +1046,28 @@ window.resetData = () => {
   }
 };
 
+window.runAutoAttendanceManual = () => {
+  const r = runAutoAttendance();
+  if (r.total === 0) {
+    toast('Tidak ada absensi yang perlu di-auto-fill saat ini');
+  } else {
+    toast('🤖 Auto: ' + r.createdIn + ' in dibuat, ' + r.createdOut + ' out dibuat, ' + (r.updatedIn + r.updatedOut) + ' diperbarui');
+  }
+  go('hrd-att');
+};
+
 /* ============================================================
-   HRD VIEWS
+   HRD
    ============================================================ */
 VIEWS['hrd-dash'] = () => {
   const totalEmp = state.employees.length;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateStr();
   const todayAtt = state.attendances.filter(a => a.date === todayStr);
   const pendOT = state.overtimeRequests.filter(o => o.status === 'pending');
   const pendLeave = state.leaveRequests.filter(l => l.status === 'pending');
   const clockedIn = todayAtt.filter(a => a.status === 'hadir' && (!a.outTime || a.outTime === '-')).length;
   const clockedOut = todayAtt.filter(a => a.outTime && a.outTime !== '-').length;
+  const autoToday = todayAtt.filter(a => a.autoIn || a.autoOut).length;
   return '<h2 class="text-lg md:text-xl font-bold mb-3 md:mb-4 text-purple-900">Dashboard HR</h2>' +
     '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">' +
       statCard('Karyawan Klinik', totalEmp, '👥', 'bg-purple-50') +
@@ -792,15 +1075,23 @@ VIEWS['hrd-dash'] = () => {
       statCard('Pending Lembur', pendOT.length, '🕒', 'bg-yellow-50') +
       statCard('Pending Cuti/Izin', pendLeave.length, '📝', 'bg-white') +
     '</div>' +
-    '<div class="grid grid-cols-2 gap-3 mb-4">' +
-      statCard('Sudah Clock In', clockedIn, '📸', 'bg-purple-50') +
-      statCard('Sudah Clock Out', clockedOut, '🚪', 'bg-yellow-50') +
+    '<div class="grid grid-cols-3 gap-3 mb-4">' +
+      statCard('Clock In', clockedIn, '📸', 'bg-purple-50') +
+      statCard('Clock Out', clockedOut, '🚪', 'bg-yellow-50') +
+      statCard('Auto-Attendance', autoToday, '🤖', 'bg-yellow-50') +
+    '</div>' +
+    '<div class="bg-white border border-purple-100 rounded-xl shadow-sm p-3 md:p-4 mb-4">' +
+      '<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">' +
+        '<div><h3 class="font-semibold text-sm md:text-base text-purple-900">Auto-Attendance Engine</h3>' +
+        '<p class="text-xs text-slate-500 mt-1">Isi otomatis absensi yang lupa di-clock-in/out (>2 jam dari jadwal shift)</p></div>' +
+        '<button onclick="runAutoAttendanceManual()" class="bg-yellow-400 hover:bg-yellow-500 text-purple-900 px-4 py-2 rounded-lg text-sm font-semibold shadow">🤖 Jalankan Sekarang</button>' +
+      '</div>' +
     '</div>' +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm p-3 md:p-4">' +
       '<h3 class="font-semibold mb-2 text-sm md:text-base text-purple-900">5 Karyawan Terbaru</h3>' +
       '<table class="w-full text-sm"><tbody>' +
         state.employees.slice(-5).reverse().map(e =>
-          '<tr class="border-b border-purple-50 cursor-pointer hover:bg-purple-50" onclick="viewEmpDetail(\'' + e.id + '\')"><td class="py-2">' + e.name + '</td><td class="text-slate-500 text-xs">' + e.position + '</td><td class="text-right text-slate-500 text-xs">' + branchName(e.branchId) + '</td></tr>'
+          '<tr class="border-b border-purple-50 cursor-pointer hover:bg-purple-50" onclick="viewEmpDetail(\'' + e.id + '\')"><td class="py-2">' + e.name + '</td><td class="text-slate-500 text-xs">' + e.position + '</td><td class="text-right">' + shiftBadge(e.shiftId) + '</td></tr>'
         ).join('') +
       '</tbody></table></div>';
 };
@@ -810,32 +1101,35 @@ VIEWS['hrd-emp'] = () => {
     '<tr class="border-b border-purple-50 hover:bg-purple-50 cursor-pointer" onclick="viewEmpDetail(\'' + e.id + '\')">' +
     '<td class="py-2 px-3 font-mono text-xs">' + e.id + '</td><td class="py-2 px-3">' + e.name + '</td>' +
     '<td class="py-2 px-3 text-slate-600">' + e.position + '</td><td class="py-2 px-3">' + branchName(e.branchId) + '</td>' +
-    '<td class="py-2 px-3 text-right">' + fmt(e.base) + '</td>' +
-    '<td class="py-2 px-3 text-xs text-slate-500">' + e.bankName + ' · ' + e.bankAccount + '</td></tr>'
+    '<td class="py-2 px-3">' + shiftBadge(e.shiftId) + '</td>' +
+    '<td class="py-2 px-3 text-right">' + fmt(e.base) + '</td></tr>'
   ).join('');
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Data Karyawan (' + state.employees.length + ')</h2>' + scrollHint() +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto max-h-[70vh]"><table class="w-full text-sm">' +
-    tableHead(['ID','Nama','Jabatan','Cabang','Gaji Pokok','Rekening']) + '<tbody>' + rows + '</tbody></table></div>';
+    tableHead(['ID','Nama','Jabatan','Cabang','Shift','Gaji']) + '<tbody>' + rows + '</tbody></table></div>';
 };
 
 VIEWS['hrd-att'] = () => {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateStr();
   const todays = state.attendances.filter(a => a.date === todayStr);
-  const rows = todays.slice(0, 50).map(a => {
+  const rows = todays.slice(0, 60).map(a => {
     const e = empById(a.empId) || {};
+    const shift = getShiftById(a.shiftId || e.shiftId);
     return '<tr class="border-b border-purple-50 hover:bg-purple-50">' +
       '<td class="py-2 px-3 font-mono text-xs">' + a.empId + '</td>' +
-      '<td class="py-2 px-3">' + e.name + '</td>' +
-      '<td class="py-2 px-3">' + branchName(e.branchId) + '</td>' +
-      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'in', a.selfieData) + '</td>' +
-      '<td class="py-2 px-3 font-mono">' + a.inTime + '</td>' +
-      '<td class="py-2 px-3 font-mono">' + (a.outTime === '-' ? '<span class="text-slate-300">—</span>' : a.outTime) + '</td>' +
-      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'out', a.outSelfieData) + '</td>' +
+      '<td class="py-2 px-3">' + e.name + '<br>' + shiftBadge(a.shiftId || e.shiftId) + '</td>' +
+      '<td class="py-2 px-3 text-xs">' + branchName(e.branchId) + '</td>' +
+      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'in', a.selfieData, a.autoIn) + '</td>' +
+      '<td class="py-2 px-3 font-mono">' + (a.inTime === '-' ? '—' : a.inTime + autoBadge(a.autoIn)) + '</td>' +
+      '<td class="py-2 px-3 font-mono">' + (a.outTime === '-' ? '—' : a.outTime + autoBadge(a.autoOut)) + '</td>' +
+      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'out', a.outSelfieData, a.autoOut) + '</td>' +
       '<td class="py-2 px-3">' + badge(a.status) + (a.lateMinutes ? ' <span class="text-yellow-600 text-xs">(' + a.lateMinutes + 'm)</span>' : '') + '</td>' +
       '<td class="py-2 px-3"><button onclick="correctAttendance(\'' + a.id + '\')" class="inline-btn text-xs text-purple-600 hover:underline">Koreksi</button></td></tr>';
   }).join('');
-  return '<h2 class="text-lg md:text-xl font-bold mb-2 text-purple-900">Monitoring Absensi</h2>' +
-    '<p class="text-xs md:text-sm text-slate-500 mb-3">' + fmtDate(todayStr) + ' · ' + Math.min(50, todays.length) + ' dari ' + todays.length + ' record</p>' +
+  return '<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">' +
+    '<div><h2 class="text-lg md:text-xl font-bold text-purple-900">Monitoring Absensi</h2>' +
+    '<p class="text-xs md:text-sm text-slate-500 mt-0.5">' + fmtDate(todayStr) + ' · ' + Math.min(60, todays.length) + ' dari ' + todays.length + ' record</p></div>' +
+    '<button onclick="runAutoAttendanceManual()" class="bg-yellow-400 hover:bg-yellow-500 text-purple-900 px-3 py-2 rounded-lg text-xs font-semibold self-start md:self-auto">🤖 Run Auto-Attendance</button></div>' +
     scrollHint() +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto"><table class="w-full text-sm">' +
     tableHead(['ID','Nama','Cabang','Foto In','In','Out','Foto Out','Status','Aksi']) + '<tbody>' + rows + '</tbody></table></div>';
@@ -847,11 +1141,12 @@ window.correctAttendance = id => {
   openModal(
     '<h3 class="font-bold text-base md:text-lg mb-3 text-purple-900">Koreksi Absensi</h3>' +
     '<p class="text-sm text-slate-500 mb-3">' + empById(a.empId).name + ' — ' + a.date + '</p>' +
+    (a.autoIn || a.autoOut ? '<div class="warn-banner mb-3"><b>⚠ Record ini diisi otomatis:</b> ' + (a.autoNote || '-') + '</div>' : '') +
     '<div class="space-y-3 text-sm">' +
       '<div><label class="text-xs text-slate-600 font-medium">Status</label><select id="cStatus" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1">' +
         ['hadir','izin','sakit','alpha'].map(s => '<option ' + (a.status === s ? 'selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
       '<div class="grid grid-cols-2 gap-2">' +
-        '<div><label class="text-xs text-slate-600 font-medium">In</label><input id="cIn" value="' + a.inTime + '" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
+        '<div><label class="text-xs text-slate-600 font-medium">In</label><input id="cIn" value="' + (a.inTime === '-' ? '' : a.inTime) + '" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
         '<div><label class="text-xs text-slate-600 font-medium">Out</label><input id="cOut" value="' + (a.outTime === '-' ? '' : a.outTime) + '" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
       '</div>' +
       '<div><label class="text-xs text-slate-600 font-medium">Late (menit)</label><input id="cLate" type="number" value="' + (a.lateMinutes || 0) + '" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
@@ -864,11 +1159,14 @@ window.correctAttendance = id => {
 window.saveCorrection = id => {
   const a = state.attendances.find(x => x.id === id);
   a.status = document.getElementById('cStatus').value;
-  a.inTime = document.getElementById('cIn').value;
+  a.inTime = document.getElementById('cIn').value || '-';
   const newOut = document.getElementById('cOut').value;
   a.outTime = newOut || '-';
   a.lateMinutes = parseInt(document.getElementById('cLate').value) || 0;
   a.correctedBy = state.currentUser.name;
+  a.autoIn = false;
+  a.autoOut = false;
+  a.autoNote = (a.autoNote ? a.autoNote + '; Dikoreksi oleh ' + state.currentUser.name : 'Dikoreksi oleh ' + state.currentUser.name);
   audit('Koreksi absensi ' + a.empId);
   persist();
   closeModal();
@@ -953,24 +1251,26 @@ window.rejectLeave = id => {
 VIEWS['hrd-report'] = () => {
   const perBranch = state.branches.map(b => {
     const emps = state.employees.filter(e => e.branchId === b.id);
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localDateStr();
     const today = state.attendances.filter(a => a.date === todayStr && emps.some(e => e.id === a.empId));
     const hadir = today.filter(a => a.status === 'hadir').length;
     const out = today.filter(a => a.outTime && a.outTime !== '-').length;
+    const auto = today.filter(a => a.autoIn || a.autoOut).length;
     const ot = state.overtimeRequests.filter(o => o.branchId === b.id && o.status === 'approved').reduce((s, o) => s + o.hours, 0);
-    return { name: b.name, total: emps.length, hadir, out, ot, pct: emps.length ? Math.round(hadir / emps.length * 100) : 0 };
+    return { name: b.name, total: emps.length, hadir, out, auto, ot, pct: emps.length ? Math.round(hadir / emps.length * 100) : 0 };
   });
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Laporan HR per Cabang</h2>' + scrollHint() +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm p-3 md:p-4 overflow-x-auto"><table class="w-full text-sm">' +
-    tableHead(['Cabang','Karyawan','In','Out','%','Lembur']) +
+    tableHead(['Cabang','Karyawan','In','Out','Auto','%','Lembur']) +
     '<tbody>' + perBranch.map(b => '<tr class="border-b border-purple-50"><td class="py-2 px-3">' + b.name + '</td>' +
       '<td class="py-2 px-3">' + b.total + '</td><td class="py-2 px-3">' + b.hadir + '</td><td class="py-2 px-3">' + b.out + '</td>' +
+      '<td class="py-2 px-3">' + (b.auto ? '<span class="badge-auto">' + b.auto + ' AUTO</span>' : '0') + '</td>' +
       '<td class="py-2 px-3">' + b.pct + '%</td><td class="py-2 px-3">' + b.ot + 'j</td></tr>').join('') +
     '</tbody></table></div>';
 };
 
 /* ============================================================
-   FINANCE VIEWS
+   FINANCE
    ============================================================ */
 VIEWS['fin-dash'] = () => {
   const runs = state.payrollRuns;
@@ -993,7 +1293,7 @@ VIEWS['fin-dash'] = () => {
 };
 
 VIEWS['fin-payroll'] = () => {
-  const cur = new Date().toISOString().slice(0, 7);
+  const cur = localDateStr().slice(0, 7);
   const existing = state.payrollRuns.find(r => r.period === cur);
   if (existing) return renderPayrollDetail(existing);
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Payroll Run</h2>' +
@@ -1087,7 +1387,8 @@ function renderPayslip(pr, r) {
     '<div class="grid grid-cols-2 gap-2 text-xs md:text-sm mb-3">' +
       '<div><span class="text-slate-500">Nama:</span> <b>' + r.name + '</b></div><div><span class="text-slate-500">ID:</span> ' + r.empId + '</div>' +
       '<div><span class="text-slate-500">Jabatan:</span> ' + r.position + '</div><div><span class="text-slate-500">Cabang:</span> ' + branchName(r.branchId) + '</div>' +
-      '<div class="col-span-2"><span class="text-slate-500">Rek:</span> ' + r.bankName + ' · ' + r.bankAccount + '</div></div>' +
+      '<div><span class="text-slate-500">Shift:</span> ' + (r.shiftLabel || '-') + '</div>' +
+      '<div><span class="text-slate-500">Rek:</span> ' + r.bankName + ' · ' + r.bankAccount + '</div></div>' +
     '<table class="w-full text-xs md:text-sm mb-3">' +
       '<tr><td class="py-1">Gaji Pokok</td><td class="text-right py-1">' + fmt(r.base) + '</td></tr>' +
       '<tr><td class="py-1">Tunjangan</td><td class="text-right py-1">' + fmt(r.allowance) + '</td></tr>' +
@@ -1166,7 +1467,7 @@ VIEWS['fin-report'] = () => {
 };
 
 /* ============================================================
-   MANAGER VIEWS
+   MANAGER
    ============================================================ */
 function mgrBranch() { return state.currentUser.branchId; }
 function mgrEmps() { return state.employees.filter(e => e.branchId === mgrBranch()); }
@@ -1174,7 +1475,7 @@ function mgrEmps() { return state.employees.filter(e => e.branchId === mgrBranch
 VIEWS['mgr-dash'] = () => {
   const br = mgrBranch();
   const emps = mgrEmps();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateStr();
   const today = state.attendances.filter(a => a.date === todayStr && emps.some(e => e.id === a.empId));
   const pendOT = state.overtimeRequests.filter(o => o.branchId === br && o.status === 'pending');
   const pendLV = state.leaveRequests.filter(l => l.branchId === br && l.status === 'pending');
@@ -1189,17 +1490,17 @@ VIEWS['mgr-dash'] = () => {
 };
 
 VIEWS['mgr-att'] = () => {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateStr();
   const emps = mgrEmps();
   const todays = state.attendances.filter(a => a.date === todayStr && emps.some(e => e.id === a.empId));
   const rows = todays.map(a => {
     const e = empById(a.empId);
     return '<tr class="border-b border-purple-50"><td class="py-2 px-3 font-mono text-xs">' + a.empId + '</td>' +
-      '<td class="py-2 px-3">' + e.name + '</td>' +
-      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'in', a.selfieData) + '</td>' +
-      '<td class="py-2 px-3 font-mono">' + a.inTime + '</td>' +
-      '<td class="py-2 px-3 font-mono">' + (a.outTime === '-' ? '—' : a.outTime) + '</td>' +
-      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'out', a.outSelfieData) + '</td>' +
+      '<td class="py-2 px-3">' + e.name + '<br>' + shiftBadge(a.shiftId || e.shiftId) + '</td>' +
+      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'in', a.selfieData, a.autoIn) + '</td>' +
+      '<td class="py-2 px-3 font-mono">' + (a.inTime === '-' ? '—' : a.inTime + autoBadge(a.autoIn)) + '</td>' +
+      '<td class="py-2 px-3 font-mono">' + (a.outTime === '-' ? '—' : a.outTime + autoBadge(a.autoOut)) + '</td>' +
+      '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'out', a.outSelfieData, a.autoOut) + '</td>' +
       '<td class="py-2 px-3">' + badge(a.status) + (a.lateMinutes ? ' (' + a.lateMinutes + 'm)' : '') + '</td></tr>';
   }).join('');
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Absensi ' + branchName(mgrBranch()) + '</h2>' + scrollHint() +
@@ -1242,28 +1543,31 @@ VIEWS['mgr-team'] = () => {
     '<tr class="border-b border-purple-50 hover:bg-purple-50 cursor-pointer" onclick="viewEmpDetail(\'' + e.id + '\')">' +
     '<td class="py-2 px-3 font-mono text-xs">' + e.id + '</td><td class="py-2 px-3">' + e.name + '</td>' +
     '<td class="py-2 px-3 text-slate-600 text-xs">' + e.position + '</td>' +
+    '<td class="py-2 px-3">' + shiftBadge(e.shiftId) + '</td>' +
     '<td class="py-2 px-3 text-xs">' + e.bankName + ' · ' + e.bankAccount + '</td></tr>'
   ).join('');
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Tim Saya (' + emps.length + ')</h2>' + scrollHint() +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto"><table class="w-full text-sm">' +
-    tableHead(['ID','Nama','Jabatan','Rek']) + '<tbody>' + rows + '</tbody></table></div>';
+    tableHead(['ID','Nama','Jabatan','Shift','Rek']) + '<tbody>' + rows + '</tbody></table></div>';
 };
 
 /* ============================================================
-   EMPLOYEE VIEWS
+   EMPLOYEE
    ============================================================ */
 function me() { return empById(state.currentUser.employeeId); }
 
 VIEWS['emp-dash'] = () => {
   const e = me();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const shift = getShiftById(e.shiftId);
+  const todayStr = localDateStr();
   const att = state.attendances.find(a => a.empId === e.id && a.date === todayStr);
   const myOT = state.overtimeRequests.filter(o => o.empId === e.id);
   const myLV = state.leaveRequests.filter(l => l.empId === e.id);
   const myPayslips = state.payrollRuns.filter(r => r.status === 'published' && r.rows.some(x => x.empId === e.id));
   const statusHariIni = !att ? 'Belum Absen' : (att.outTime === '-' ? 'Clock In' : 'Selesai');
   return '<h2 class="text-lg md:text-xl font-bold mb-1 text-purple-900">Hai, ' + e.name.split(' ')[0] + ' 👋</h2>' +
-    '<p class="text-xs md:text-sm text-slate-500 mb-3 md:mb-4">' + e.position + ' · ' + branchName(e.branchId) + '</p>' +
+    '<p class="text-xs md:text-sm text-slate-500 mb-2">' + e.position + ' · ' + branchName(e.branchId) + '</p>' +
+    '<p class="text-xs mb-3"><b>Shift Anda:</b> ' + shiftBadge(e.shiftId) + ' ' + shift.name + '</p>' +
     '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">' +
       statCard('Hari Ini', statusHariIni, '⏰', att ? 'bg-purple-50' : 'bg-yellow-50') +
       statCard('Lembur', myOT.length, '🕒', 'bg-white') +
@@ -1289,22 +1593,48 @@ VIEWS['emp-dash'] = () => {
 
 VIEWS['emp-clock'] = () => {
   const e = me();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const shift = getShiftById(e.shiftId);
+  const todayStr = localDateStr();
+  const now = new Date();
+  const shiftStart = getShiftStart(shift, todayStr);
+  const shiftEnd = getShiftEnd(shift, todayStr);
   const todayAtt = state.attendances.find(a => a.empId === e.id && a.date === todayStr);
   const last7 = state.attendances.filter(a => a.empId === e.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
 
+  // Cek apakah masih ada pending dari kemarin (shift lintas hari)
+  const pendingYesterday = findPendingAttendance(e.id);
+  const pendingIsYesterday = pendingYesterday && pendingYesterday.date !== todayStr;
+
+  // Warning auto-attendance
+  const overdueIn = !todayAtt && now.getTime() > shiftStart.getTime() + AUTO_ATTENDANCE_THRESHOLD_MS;
+  const overdueOut = todayAtt && todayAtt.inTime !== '-' && (!todayAtt.outTime || todayAtt.outTime === '-')
+                     && now.getTime() > shiftEnd.getTime() + AUTO_ATTENDANCE_THRESHOLD_MS;
+
+  let warningBanner = '';
+  if (overdueIn) {
+    warningBanner = '<div class="warn-banner mb-3">⚠ <b>Anda terlambat clock in >2 jam</b> dari jadwal shift. Sistem akan otomatis mengisi absensi Anda sesuai jadwal. Segera clock in manual jika masih memungkinkan, atau hubungi HRD.</div>';
+  } else if (overdueOut) {
+    warningBanner = '<div class="warn-banner mb-3">⚠ <b>Anda belum clock out >2 jam</b> dari akhir shift. Sistem akan otomatis mengisi jam clock-out Anda sesuai jadwal. Segera clock out manual jika masih memungkinkan.</div>';
+  }
+
   let statusBox;
-  if (!todayAtt) {
+  if (pendingIsYesterday) {
+    statusBox = '<div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 mb-4">' +
+      '<p class="text-xs text-slate-600 mb-1">Shift lintas hari belum selesai:</p>' +
+      '<p class="text-sm font-bold text-purple-900 mb-3">Clock In kemarin ' + pendingYesterday.inTime + ' — belum clock out</p>' +
+      '<button onclick="startClockCapture(\'out\')" class="w-full bg-yellow-400 hover:bg-yellow-500 text-purple-900 py-3.5 rounded-xl font-bold text-base shadow-lg">🚪 Clock Out Shift Kemarin</button></div>';
+  } else if (!todayAtt || !todayAtt.inTime || todayAtt.inTime === '-') {
     statusBox = '<div class="bg-white border-2 border-dashed border-purple-300 rounded-xl p-5 mb-4 text-center">' +
-      '<p class="text-sm text-slate-600 mb-3">Anda belum absen hari ini</p>' +
+      '<p class="text-sm text-slate-600 mb-1">Anda belum absen hari ini</p>' +
+      '<p class="text-xs text-slate-400 mb-3">Shift ' + shift.name + ' (' + shift.label + ')</p>' +
       '<button onclick="startClockCapture(\'in\')" class="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white py-3.5 rounded-xl font-semibold text-base shadow-lg">📸 Clock In Sekarang</button>' +
-      '<p class="text-xs text-slate-400 mt-2">Selfie + GPS otomatis</p></div>';
+      '<p class="text-xs text-slate-400 mt-2">Selfie + GPS otomatis · Tanpa mirroring</p></div>';
   } else if (!todayAtt.outTime || todayAtt.outTime === '-') {
     statusBox = '<div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">' +
       '<div class="flex justify-between items-center mb-3">' +
         '<div class="flex items-center gap-2">' +
-          (todayAtt.selfieData ? '<img src="' + todayAtt.selfieData + '" class="w-12 h-12 rounded-lg object-cover border-2 border-purple-300 cursor-pointer" onclick="showAttendancePhoto(\'' + todayAtt.id + '\',\'in\')">' : '<div class="w-12 h-12 rounded-lg bg-purple-200 flex items-center justify-center text-xs text-purple-600">No 📷</div>') +
-          '<div><p class="text-xs text-slate-600">Clock In</p><p class="font-bold text-purple-800 text-lg">' + todayAtt.inTime + '</p></div></div>' +
+          (todayAtt.selfieData ? '<img src="' + todayAtt.selfieData + '" class="w-12 h-12 rounded-lg object-cover border-2 border-purple-300 cursor-pointer" onclick="showAttendancePhoto(\'' + todayAtt.id + '\',\'in\')">' : '<div class="w-12 h-12 rounded-lg bg-purple-200 flex items-center justify-center text-xs text-purple-600">' + (todayAtt.autoIn ? 'AUTO' : 'No 📷') + '</div>') +
+          '<div><p class="text-xs text-slate-600">Clock In</p><p class="font-bold text-purple-800 text-lg">' + todayAtt.inTime + autoBadge(todayAtt.autoIn) + '</p></div></div>' +
         '<div class="text-right"><p class="text-xs text-slate-600">Clock Out</p><p class="font-bold text-slate-400">Belum</p></div></div>' +
       '<button onclick="startClockCapture(\'out\')" class="w-full bg-yellow-400 hover:bg-yellow-500 active:bg-yellow-600 text-purple-900 py-3.5 rounded-xl font-bold text-base shadow-lg">🚪 Clock Out Sekarang</button>' +
       '<p class="text-xs text-slate-500 mt-2 text-center">Selfie + GPS otomatis</p></div>';
@@ -1312,24 +1642,27 @@ VIEWS['emp-clock'] = () => {
     statusBox = '<div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">' +
       '<div class="flex justify-between items-center mb-3">' +
         '<div class="flex items-center gap-2">' +
-          (todayAtt.selfieData ? '<img src="' + todayAtt.selfieData + '" class="w-12 h-12 rounded-lg object-cover border-2 border-green-300 cursor-pointer" onclick="showAttendancePhoto(\'' + todayAtt.id + '\',\'in\')">' : '<div class="w-12 h-12 rounded-lg bg-green-200 flex items-center justify-center text-xs">✓</div>') +
-          '<div><p class="text-xs text-slate-600">Clock In</p><p class="font-bold text-green-700 text-lg">' + todayAtt.inTime + '</p></div></div>' +
+          (todayAtt.selfieData ? '<img src="' + todayAtt.selfieData + '" class="w-12 h-12 rounded-lg object-cover border-2 border-green-300 cursor-pointer" onclick="showAttendancePhoto(\'' + todayAtt.id + '\',\'in\')">' : '<div class="w-12 h-12 rounded-lg bg-green-200 flex items-center justify-center text-xs">' + (todayAtt.autoIn ? 'AUTO' : '✓') + '</div>') +
+          '<div><p class="text-xs text-slate-600">Clock In</p><p class="font-bold text-green-700 text-lg">' + todayAtt.inTime + autoBadge(todayAtt.autoIn) + '</p></div></div>' +
         '<div class="flex items-center gap-2">' +
-          '<div class="text-right"><p class="text-xs text-slate-600">Clock Out</p><p class="font-bold text-green-700 text-lg">' + todayAtt.outTime + '</p></div>' +
-          (todayAtt.outSelfieData ? '<img src="' + todayAtt.outSelfieData + '" class="w-12 h-12 rounded-lg object-cover border-2 border-green-300 cursor-pointer" onclick="showAttendancePhoto(\'' + todayAtt.id + '\',\'out\')">' : '') +
+          '<div class="text-right"><p class="text-xs text-slate-600">Clock Out</p><p class="font-bold text-green-700 text-lg">' + todayAtt.outTime + autoBadge(todayAtt.autoOut) + '</p></div>' +
+          (todayAtt.outSelfieData ? '<img src="' + todayAtt.outSelfieData + '" class="w-12 h-12 rounded-lg object-cover border-2 border-green-300 cursor-pointer" onclick="showAttendancePhoto(\'' + todayAtt.id + '\',\'out\')">' : (todayAtt.autoOut ? '<div class="w-12 h-12 rounded-lg bg-yellow-200 flex items-center justify-center text-[9px] font-bold text-yellow-800">AUTO</div>' : '')) +
         '</div></div>' +
       '<p class="text-center text-sm text-green-700 font-medium">✓ Absensi hari ini selesai</p></div>';
   }
 
-  const rows = last7.map(a =>
-    '<tr class="border-b border-purple-50"><td class="py-2 px-3 whitespace-nowrap">' + fmtDate(a.date) + '</td>' +
-    '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'in', a.selfieData) + '</td>' +
-    '<td class="py-2 px-3 font-mono">' + a.inTime + '</td>' +
-    '<td class="py-2 px-3 font-mono">' + (a.outTime === '-' ? '—' : a.outTime) + '</td>' +
-    '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'out', a.outSelfieData) + '</td>' +
-    '<td class="py-2 px-3">' + badge(a.status) + (a.lateMinutes ? ' (' + a.lateMinutes + 'm)' : '') + '</td></tr>'
-  ).join('');
-  return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Absensi Saya</h2>' + statusBox + scrollHint() +
+  const rows = last7.map(a => {
+    const s = getShiftById(a.shiftId || e.shiftId);
+    return '<tr class="border-b border-purple-50"><td class="py-2 px-3 whitespace-nowrap">' + fmtDate(a.date) + '<br>' + shiftBadge(a.shiftId || e.shiftId) + '</td>' +
+    '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'in', a.selfieData, a.autoIn) + '</td>' +
+    '<td class="py-2 px-3 font-mono">' + (a.inTime === '-' ? '—' : a.inTime + autoBadge(a.autoIn)) + '</td>' +
+    '<td class="py-2 px-3 font-mono">' + (a.outTime === '-' ? '—' : a.outTime + autoBadge(a.autoOut)) + '</td>' +
+    '<td class="py-2 px-3 text-center">' + photoThumb(a.id, 'out', a.outSelfieData, a.autoOut) + '</td>' +
+    '<td class="py-2 px-3">' + badge(a.status) + (a.lateMinutes ? ' (' + a.lateMinutes + 'm)' : '') + '</td></tr>';
+  }).join('');
+  return '<h2 class="text-lg md:text-xl font-bold mb-2 text-purple-900">Absensi Saya</h2>' +
+    '<p class="text-xs text-slate-500 mb-3">Shift Anda: ' + shiftBadge(e.shiftId) + ' ' + shift.name + ' (' + shift.label + ')</p>' +
+    warningBanner + statusBox + scrollHint() +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto"><table class="w-full text-sm">' +
     tableHead(['Tanggal','Foto In','In','Out','Foto Out','Status']) + '<tbody>' + rows + '</tbody></table></div>';
 };
@@ -1347,7 +1680,7 @@ VIEWS['emp-ot'] = () => {
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm p-3 md:p-4 mb-4">' +
       '<h3 class="font-semibold mb-3 text-xs md:text-sm text-purple-900">Form Pengajuan</h3>' +
       '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 text-sm">' +
-        '<div class="col-span-2 md:col-span-1"><label class="text-xs text-slate-600 font-medium">Tanggal</label><input id="otDate" type="date" value="' + new Date().toISOString().slice(0, 10) + '" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
+        '<div class="col-span-2 md:col-span-1"><label class="text-xs text-slate-600 font-medium">Tanggal</label><input id="otDate" type="date" value="' + todayStr() + '" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
         '<div><label class="text-xs text-slate-600 font-medium">Jam</label><input id="otHours" type="number" step="0.5" min="0.5" value="2" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div>' +
         '<div class="col-span-2 md:col-span-3"><label class="text-xs text-slate-600 font-medium">Alasan</label><input id="otReason" type="text" placeholder="Contoh: extra shift" class="w-full border border-purple-200 rounded-lg px-3 py-2 mt-1"></div></div>' +
       '<button onclick="submitOT()" class="mt-3 w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow">Ajukan Lembur</button></div>' +
@@ -1355,6 +1688,8 @@ VIEWS['emp-ot'] = () => {
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm overflow-x-auto"><table class="w-full text-sm">' +
     tableHead(['ID','Tanggal','Jam','Alasan','Status']) + '<tbody>' + rows + '</tbody></table></div>';
 };
+
+function todayStr() { return localDateStr(); }
 
 window.submitOT = () => {
   const e = me();
@@ -1441,6 +1776,7 @@ window.viewMyPayslip = prId => {
 
 VIEWS['emp-profile'] = () => {
   const e = me();
+  const shift = getShiftById(e.shiftId);
   return '<h2 class="text-lg md:text-xl font-bold mb-3 text-purple-900">Profil Saya</h2>' +
     '<div class="bg-white border border-purple-100 rounded-xl shadow-sm p-3 md:p-6 max-w-xl mb-4">' +
       '<div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 md:gap-3 text-sm">' +
@@ -1448,6 +1784,8 @@ VIEWS['emp-profile'] = () => {
         '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Nama:</span> <b>' + e.name + '</b></div>' +
         '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Jabatan:</span> <span>' + e.position + '</span></div>' +
         '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Cabang:</span> <span>' + branchName(e.branchId) + '</span></div>' +
+        '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Shift:</span> <span>' + shiftBadge(e.shiftId) + ' ' + shift.name + '</span></div>' +
+        '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Jam Kerja:</span> <span class="font-mono">' + shift.label + '</span></div>' +
         '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Gaji Pokok:</span> <span>' + fmt(e.base) + '</span></div>' +
         '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Tunjangan:</span> <span>' + fmt(e.allowance) + '</span></div>' +
         '<div class="flex justify-between md:block border-b md:border-0 border-purple-50 pb-2 md:pb-0"><span class="text-slate-500">Bank:</span> <span>' + e.bankName + '</span></div>' +
@@ -1465,7 +1803,8 @@ VIEWS['emp-profile'] = () => {
 window.viewEmpDetail = empId => {
   const e = empById(empId);
   if (!e) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const shift = getShiftById(e.shiftId);
+  const todayStr = localDateStr();
   const todayAtt = state.attendances.find(a => a.empId === e.id && a.date === todayStr);
   const myOT = state.overtimeRequests.filter(o => o.empId === e.id && o.status === 'approved').reduce((s, o) => s + o.hours, 0);
   const myPayslip = state.payrollRuns.filter(r => r.status === 'published' && r.rows.some(x => x.empId === e.id)).slice(-1)[0];
@@ -1481,6 +1820,7 @@ window.viewEmpDetail = empId => {
     '<div class="grid grid-cols-2 gap-2 text-sm mb-3">' +
       '<div><span class="text-slate-500">Cabang:</span> ' + branchName(e.branchId) + '</div>' +
       '<div><span class="text-slate-500">Status:</span> ' + badge(e.status) + '</div>' +
+      '<div class="col-span-2"><span class="text-slate-500">Shift:</span> ' + shiftBadge(e.shiftId) + ' ' + shift.name + ' (' + shift.label + ')</div>' +
       '<div><span class="text-slate-500">Gaji:</span> ' + fmt(e.base) + '</div>' +
       '<div><span class="text-slate-500">Tunjangan:</span> ' + fmt(e.allowance) + '</div>' +
       '<div class="col-span-2"><span class="text-slate-500">Rekening:</span> ' + e.bankName + ' · ' + e.bankAccount + '</div>' +
